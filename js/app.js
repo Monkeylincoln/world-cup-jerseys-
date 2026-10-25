@@ -47,11 +47,11 @@
     return parts.length > 1 ? parts.slice(1).join(' ') : name;
   }
 
-  function tier(ovr) {
-    if (ovr >= 90) return 'elite toty';
-    if (ovr >= 87) return 'elite';
-    if (ovr >= 75) return 'gold';
-    if (ovr >= 65) return 'silver';
+  // only the hand-picked Team of the Year players get the special card
+  function tier(p) {
+    if (p.toty) return 'elite toty';
+    if (p.ovr >= 75) return 'gold';
+    if (p.ovr >= 65) return 'silver';
     return 'bronze';
   }
 
@@ -102,6 +102,7 @@
       ...E.nations.map((t) => ({ ...t, type: 'nation' })),
     ];
     const best = {};
+    const toty = new Set(E.toty || []);
     all.forEach((t) => {
       t.players = t.players.split(';').map((s) => {
         const [name, pos, ovr, nat] = s.split(',');
@@ -111,7 +112,7 @@
     });
     all.forEach((t) => {
       // the same player keeps one rating across club and country
-      t.players.forEach((p) => { p.ovr = best[p.name]; players[p.uid] = p; });
+      t.players.forEach((p) => { p.ovr = best[p.name]; p.toty = toty.has(p.name); players[p.uid] = p; });
       const top = t.players.map((p) => p.ovr).sort((a, b) => b - a).slice(0, 11);
       t.strength = Math.round((top.reduce((a, b) => a + b, 0) / top.length) * 10) / 10;
       teams[t.id] = t;
@@ -291,13 +292,13 @@
 
   function card(p, opts = {}) {
     const { ovr = p.ovr, pos = p.pos, size = '', extra = '' } = opts;
-    return `<div class="card tier-${tier(p.ovr)} ${size} ${extra}">
+    return `<div class="card tier-${tier(p)} ${size} ${extra}">
       <div class="card-shine"></div>
       <div class="card-top"><div class="card-ovr">${ovr}</div><div class="card-pos">${pos}</div></div>
       <div class="card-kit">${shirt(p.team.kit)}</div>
       <div class="card-name">${esc(shortName(p.name))}</div>
       <div class="card-team"><span class="card-flag">${flag(p.nation)}</span> ${esc(p.team.short)}</div>
-      ${p.ovr >= 90 ? '<div class="card-ribbon">TOTY</div>' : ''}
+      ${p.toty ? '<div class="card-ribbon">TOTY</div>' : ''}
     </div>`;
   }
 
@@ -506,7 +507,7 @@
             : best === 'a' ? `<span class="fit a">${alt.join(' / ')} (-3)</span>`
             : '<span class="fit x">No natural spot (-10)</span>';
           return `<button class="prow ${taken ? 'taken' : ''} ${selected === p.uid ? 'picked' : ''}" data-nav data-key="p-${esc(p.uid)}" data-action="pickPlayer" data-arg="${esc(p.uid)}" ${taken ? 'disabled' : ''} ${!selected && p === first?.p ? 'data-autofocus' : ''}>
-            <span class="prow-ovr tier-${tier(p.ovr)}">${p.ovr}</span>
+            <span class="prow-ovr tier-${tier(p)}">${p.ovr}</span>
             <span class="prow-pos">${p.pos}</span>
             <span class="prow-name">${esc(p.name)} <span class="prow-flag">${flag(p.nation)}</span></span>
             ${badge}
@@ -1351,13 +1352,13 @@
     if (!reel || !strip) { land(target); return; }
     if (window.innerWidth <= 1000) reel.scrollIntoView({ block: 'center', behavior: 'smooth' });
     const item = strip.children[0].getBoundingClientRect().width;
-    const jitter = (Math.random() - 0.5) * item * 0.6;
-    const offset = -(TARGET_INDEX * item) + reel.clientWidth / 2 - item / 2 + jitter;
+    const offset = -(TARGET_INDEX * item) + reel.clientWidth / 2 - item / 2;
     requestAnimationFrame(() => requestAnimationFrame(() => {
       strip.style.transition = 'transform 2.4s cubic-bezier(.12,.75,.16,1)';
       strip.style.transform = `translateX(${offset}px)`;
     }));
-    setTimeout(() => land(target), 2550);
+    setTimeout(() => { if (strip.children[TARGET_INDEX]) strip.children[TARGET_INDEX].classList.add('hit'); }, 2420);
+    setTimeout(() => land(target), 3000);
   }
 
   function land(team) {

@@ -144,6 +144,10 @@ ERAS.now = {
       players: 'Camilo Vargas,GK,76;Daniel Munoz,RB,80;Davinson Sanchez,CB,77;Jhon Lucumi,CB,79;Johan Mojica,LB,76;Jefferson Lerma,CM,78;Richard Rios,CM,77;James Rodriguez,CAM,79;Jhon Arias,RW,78;Luis Diaz,LW,85;Jhon Duran,ST,78;Rafael Borre,ST,75' },
   ],
 
+  // Team of the Year: the only players with the special card design
+  toty: ['Gianluigi Donnarumma', 'Achraf Hakimi', 'Virgil van Dijk', 'William Saliba', 'Nuno Mendes', 'Rodri', 'Vitinha',
+    'Pedri', 'Jude Bellingham', 'Lamine Yamal', 'Ousmane Dembele', 'Kylian Mbappe', 'Erling Haaland'],
+
   comps: {
     pl: ['ars', 'avl', 'bou', 'bre', 'bri', 'bur', 'che', 'cry', 'eve', 'ful', 'lee', 'liv', 'mci', 'mun', 'new', 'nfo', 'sun', 'tot', 'whu', 'wol'],
     ucl: ['ars', 'che', 'liv', 'mci', 'new', 'tot', 'rma', 'bar', 'atm', 'ath', 'vil', 'fcb', 'bvb', 'b04', 'sge', 'int', 'juv', 'nap', 'ata',

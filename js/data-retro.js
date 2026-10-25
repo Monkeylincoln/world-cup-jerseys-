@@ -138,6 +138,10 @@ ERAS.retro = {
       players: 'Stipe Pletikosa,GK,74;Darijo Srna,RB,81;Dejan Lovren,CB,79;Vedran Corluka,CB,77;Danijel Pranjic,LB,74;Luka Modric,CM,87;Ivan Rakitic,CM,83;Mateo Kovacic,CM,77;Ivan Perisic,LW,79;Ivica Olic,ST,78;Mario Mandzukic,ST,83;Nikica Jelavic,ST,75' },
   ],
 
+  // Team of the Year: the only players with the special card design
+  toty: ['Manuel Neuer', 'Philipp Lahm', 'Sergio Ramos', 'Thiago Silva', 'David Alaba', 'Andres Iniesta', 'Toni Kroos',
+    'Angel Di Maria', 'Arjen Robben', 'Lionel Messi', 'Cristiano Ronaldo', 'Luis Suarez', 'Zlatan Ibrahimovic'],
+
   comps: {
     pl: ['che', 'mci', 'ars', 'mun', 'tot', 'liv', 'sou', 'swa', 'sto', 'cry', 'eve', 'whu', 'wba', 'lei', 'new', 'sun', 'avl', 'hul', 'bur', 'qpr'],
     ucl: ['rma', 'bas', 'liv', 'lud', 'bvb', 'ars', 'and', 'gs', 'asm', 'b04', 'zen', 'slb', 'atm', 'juv', 'oly', 'mal',
