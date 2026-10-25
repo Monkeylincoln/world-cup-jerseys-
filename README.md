@@ -1,33 +1,38 @@
-# Draft 15
+# NextHalf
 
-A football draft game with FIFA 15 style menus. Spin for a random club or national team, pick one of their players for each spot in your XI, and use your **5 free rerolls** whenever you don't like the team you landed on. Then take the squad through a knockout tournament.
+A football draft game with FIFA 15 style menus. Pick a competition, spin for a random team from it, draft one of their players, then choose where they play. You get **5 free rerolls** per draft. Once your XI is complete, you play the competition match by match.
 
 ## Play
 
-No build step. Open `index.html` in a browser, or serve the folder:
+No install. Download the folder (on GitHub: Code > Download ZIP, then extract it) and double-click `index.html`. It also works on GitHub Pages as-is.
 
-```
-python3 -m http.server 8000
-```
+## Modes
 
-It also works as-is on GitHub Pages (Settings > Pages > deploy from branch, root folder).
+| Competition | 2025/26 | Retro 2014/15 |
+| --- | --- | --- |
+| Premier League | 20 clubs, one round of fixtures (19 matchdays) | 20 clubs from 2014/15 |
+| Champions League | 36 clubs, 8-game league phase, play-off, then knockouts | 32 clubs, 8 groups of 4, then knockouts |
+| World Cup | 16 nations, 4 groups, then knockouts | 2014 squads |
+
+Your XI takes the place of the lowest-rated team in the competition.
 
 ## How it works
 
-- **Setup:** pick a team pool (clubs, nations, or both) and a formation (4-3-3, 4-4-2, 4-2-3-1, 3-5-2, 5-3-2).
-- **Draft:** each empty spot gets a spin. You land on a team and choose one of its players. Tap any empty spot to change which position you're filling.
+- **Draft:** spin, land on a team, pick a player, then tap a spot on the pitch. Green spots are natural (full rating), amber are similar (-3), red are out of position (-10).
 - **Rerolls:** 5 per draft, free. A reroll re-spins the team for the current pick.
-- **Positions:** natural = full rating, similar position = -3 OVR, out of position = -10 OVR and no chemistry.
-- **Chemistry:** up to 3 per player (33 max) from shared club, league and nation (FUT style thresholds).
-- **Tournament:** Quarter-Final, Semi-Final and Final against real squads. Draws go to penalties. Results are saved under My Squads (browser local storage).
+- **Team rating** is the average of your XI after position penalties. There's no chemistry.
+- **Matches:** play live (about a minute per match at normal speed, with commentary, a ball tracker and other scores coming in), or quick sim / sim to the end. Speed can be set to slow, normal or fast, and you can pause.
+- Results are saved under My Squads (browser local storage).
 
-Keyboard: arrows to move, Enter to select, Esc to go back, S to spin, R to reroll, Q / E to switch tabs.
+Keyboard: arrows to move, Enter to select, Esc to go back, S to spin, R to reroll, P to pause a match, Q / E to switch tabs.
 
 ## Files
 
 - `index.html` page shell
-- `css/style.css` FIFA 15 style theme
-- `js/data.js` teams, players, formations, position rules (edit this to add teams or update ratings)
-- `js/app.js` game logic and screens
+- `css/style.css` FIFA 15 style theme (and the retro theme)
+- `js/data.js` formations and position rules
+- `js/data-now.js` 2025/26 clubs and nations
+- `js/data-retro.js` 2014/15 clubs and nations
+- `js/app.js` draft, season and match logic
 
-Player ratings are rough estimates for the game, not official data.
+Player ratings are rough estimates for the game, not official data. Edit the data files to update squads or ratings.
