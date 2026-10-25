@@ -6,6 +6,8 @@ A football draft game with FIFA 15 style menus. Pick a competition, spin for a r
 
 No install. Download the folder (on GitHub: Code > Download ZIP, then extract it) and double-click `index.html`. It also works on GitHub Pages as-is.
 
+It's built for phones too: the layout adapts to small screens, works with touch, and respects the notch and home bar. On iPhone or Android you can use Share > Add to Home Screen to launch it like an app.
+
 ## Modes
 
 | Competition | 2025/26 | Retro 2014/15 |

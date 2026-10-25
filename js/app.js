@@ -209,6 +209,7 @@
   const TAB_ORDER = ['home', 'setup', 'squads', 'teams', 'howto'];
 
   function go(screen) {
+    state.confirmClear = false;
     if (screen === 'setup') {
       // the Play tab resumes whatever is in progress
       if (live) screen = 'match';
@@ -387,7 +388,7 @@
       </section>
       <div class="action-row">
         <button class="btn btn-primary" data-nav data-key="start" data-action="startDraft">Start Draft</button>
-        <span class="muted"><b class="accent">${REROLLS} rerolls</b> per draft. Free, always.</span>
+        <span class="muted">${season ? 'Starting a new draft ends your current season. ' : ''}<b class="accent">${REROLLS} rerolls</b> per draft. Free, always.</span>
       </div>
     </div>`;
   };
@@ -1145,7 +1146,7 @@
           <div class="hist-stat"><small>OVR</small><b>${h.rating}</b></div>
           <div class="hist-result">${esc(h.result)}</div>
         </div>`).join('')}</div>
-        <div class="action-row"><button class="btn" data-nav data-key="clear" data-action="clearHistory">Clear History</button></div>`
+        <div class="action-row"><button class="btn ${state.confirmClear ? 'btn-danger' : ''}" data-nav data-key="clear" data-action="clearHistory">${state.confirmClear ? 'Tap Again To Clear Everything' : 'Clear History'}</button></div>`
         : `<section class="panel empty-state"><p class="lead">No seasons yet. Finish one and it shows up here.</p>
           <button class="btn btn-primary" data-nav data-key="go-draft" data-action="go" data-arg="setup" data-autofocus>Start A Draft</button></section>`}
     </div>`;
@@ -1335,10 +1336,7 @@
     setEra: (e) => { state.setup.era = e; render(); },
     setComp: (c) => { state.setup.comp = c; render(); },
     setFormation: (f) => { state.setup.formation = f; render(); },
-    startDraft: () => {
-      if (season && !confirm('Abandon the season in progress?')) return;
-      newDraft();
-    },
+    startDraft: newDraft,
     discardDraft: () => { draft = null; state.screen = 'setup'; render(true); },
     spin: () => spin(false), reroll, pickPlayer, placeAt, swapSlot,
     confirmSquad: () => { state.screen = 'squad'; render(true); },
@@ -1378,7 +1376,11 @@
     dbEra: (e) => { state.db.era = e; state.db.view = null; render(); },
     dbComp: (c) => { state.db.comp = c; render(); },
     viewTeam: (id) => { state.db.view = id; render(true); },
-    clearHistory: () => { if (confirm('Clear all saved seasons?')) { saveHistory([]); render(true); } },
+    // tap twice to confirm (pop-up dialogs are not available everywhere)
+    clearHistory: () => {
+      if (state.confirmClear) { saveHistory([]); state.confirmClear = false; } else state.confirmClear = true;
+      render();
+    },
   };
 
   document.addEventListener('click', (e) => {
