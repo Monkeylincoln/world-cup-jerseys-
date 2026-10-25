@@ -1027,3 +1027,23 @@ body.retro .topbar { background: linear-gradient(90deg, rgba(10,22,6,0.96), rgba
   .tab { font-size: 16px; padding: 10px 7px; }
   .bumper { display: none; }
 }
+
+/* season coin rewards */
+.reward-box {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: center; margin: 10px 0 4px; padding: 10px 14px;
+  background: linear-gradient(110deg, rgba(255,207,26,0.28), rgba(255,138,0,0.18)); border: 1px solid rgba(255,207,26,0.55);
+  font-family: var(--cond); text-transform: uppercase; letter-spacing: 0.5px;
+}
+.reward-box b { font-size: 26px; color: var(--gold); }
+.reward-box span { font-size: 15px; color: #fff; }
+.reward-box.none { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.15); }
+.reward-box.none span { text-transform: none; font-family: var(--body); color: var(--muted); letter-spacing: 0; }
+.reward-table { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+.reward-table div { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; background: rgba(255,255,255,0.06); border-left: 3px solid var(--gold); }
+.reward-table b { font-family: var(--cond); font-size: 28px; color: var(--gold); line-height: 1; }
+.reward-table b::before { content: ''; display: inline-block; width: 0.8em; height: 0.8em; margin-right: 6px; border-radius: 50%; vertical-align: -0.05em;
+  background: radial-gradient(circle at 35% 35%, #fff6b0, #ffcf1a 45%, #c98a00 100%); }
+.reward-table span { font-size: 14px; color: #c9d7ea; }
+.reroll-pips i.more { width: auto; height: auto; background: none; box-shadow: none; color: var(--lime); font-style: normal; font-weight: 800; transform: none; }
+.p-count .coin { width: 0.75em; height: 0.75em; }
+.slot.fit-none .slot-empty { opacity: 0.3; }

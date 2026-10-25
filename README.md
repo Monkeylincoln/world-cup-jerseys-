@@ -1,6 +1,6 @@
 # NextHalf
 
-A football draft game with FIFA 15 style menus. Pick a competition, spin for a random team from it, draft one of their players, then choose where they play. You get **5 free rerolls** per draft. Once your XI is complete, you play the competition match by match.
+A football draft game with FIFA 15 style menus. Pick a competition, spin for a random team from it, draft one of their players, then choose where they play. You get **3 free rerolls** per draft. Once your XI is complete, you play the competition match by match.
 
 ## Play
 
@@ -20,12 +20,12 @@ Your XI takes the place of the lowest-rated team in the competition.
 
 ## How it works
 
-- **Draft:** spin, land on a team, pick a player, then tap a spot on the pitch. Green spots are natural (full rating), amber are similar (-3), red are out of position (-10).
-- **Rerolls:** 5 per draft, free. A reroll re-spins the team for the current pick.
+- **Draft:** spin, land on a team, pick a player, then tap a spot on the pitch. Like Golazo, only players whose position you still need show up; anyone for a spot you've already filled is hidden. Green spots are natural (full rating), amber are similar (-3, only for players whose position isn't in your formation).
+- **Rerolls:** 3 per draft, free. Rerolls you buy simply add to that count.
 - **Team rating** is the average of your XI after position penalties. There's no chemistry.
 - **Matches:** play live (about a minute per match at normal speed, with commentary, a ball tracker and other scores coming in), or quick sim / sim to the end. Speed can be set to slow, normal or fast, and you can pause.
-- **Coins:** earned from every match (win 100, draw 40, loss 15) plus 1,000 for a trophy.
-- **Store:** extra reroll packs (with coins or money) that kick in after your 5 free rerolls, and Remove Ads. Purchases currently run in demo mode: nothing is charged. Real billing needs a payment provider (for example Stripe) and a small server, or app store billing if NextHalf is wrapped as a phone app; the hook for it is `buy()` in `js/app.js`.
+- **Coins:** earned only from season results: 500 for winning the Champions League, World Cup or Premier League, 200 for reaching a final, 100 for a semi-final or a Premier League top 4. Nothing per match.
+- **Store:** rerolls (with coins or money), coin packs, and Remove Ads. Purchases currently run in demo mode: nothing is charged. Real billing needs a payment provider (for example Stripe) and a small server, or app store billing if NextHalf is wrapped as a phone app; the hook for it is `buy()` in `js/app.js`.
 - **Ads:** banner slots on the season and match screens show NextHalf's own promos until a real ad network is connected. Remove Ads hides them.
 - Results, coins and purchases are saved in the browser (local storage), per device.
 
