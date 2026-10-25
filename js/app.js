@@ -48,6 +48,7 @@
   }
 
   function tier(ovr) {
+    if (ovr >= 90) return 'elite toty';
     if (ovr >= 87) return 'elite';
     if (ovr >= 75) return 'gold';
     if (ovr >= 65) return 'silver';
@@ -173,6 +174,22 @@
     return null;
   }
   const loadHistory = () => store(HISTORY_KEY) || [];
+
+  // ---------- wallet & store ----------
+  // Purchases run in demo mode: nothing is charged. Real billing would plug into buy().
+  const WALLET_KEY = 'nexthalf.wallet';
+  const wallet = Object.assign({ coins: 300, rerolls: 0, noAds: false }, store(WALLET_KEY) || {});
+  const saveWallet = () => store(WALLET_KEY, wallet);
+  const PRODUCTS = {
+    r3: { name: '3 Extra Rerolls', desc: 'For when the wheel hates you.', price: '$0.99', amount: 3, color: 'cyan' },
+    r10: { name: '10 Extra Rerolls', desc: 'Enough for a few drafts.', price: '$2.49', amount: 10, tag: 'Popular', color: 'pink' },
+    r25: { name: '25 Extra Rerolls', desc: 'Never settle for a bad spin.', price: '$4.99', amount: 25, tag: 'Best value', color: 'gold' },
+    c1: { name: '1 Extra Reroll', desc: 'Paid with coins you earn from matches.', coins: 150, amount: 1, color: 'lime' },
+    c5: { name: '5 Extra Rerolls', desc: 'Coin bundle, saves 150 coins.', coins: 600, amount: 5, color: 'orange' },
+    noads: { name: 'Remove Ads', desc: 'No more ad banners on this device.', price: '$2.99', color: 'violet' },
+  };
+  const COIN_REWARD = { w: 100, d: 40, l: 15, title: 1000 };
+  const fmtNum = (n) => n.toLocaleString('en-US');
   const saveHistory = (list) => store(HISTORY_KEY, list.slice(0, 40));
 
   // ---------- state ----------
@@ -205,11 +222,12 @@
   }
 
   // ---------- navigation ----------
-  const TAB_FOR = { home: 'home', setup: 'setup', draft: 'setup', squad: 'setup', season: 'setup', match: 'setup', trophy: 'setup', squads: 'squads', teams: 'teams', howto: 'howto' };
-  const TAB_ORDER = ['home', 'setup', 'squads', 'teams', 'howto'];
+  const TAB_FOR = { home: 'home', setup: 'setup', draft: 'setup', squad: 'setup', season: 'setup', match: 'setup', trophy: 'setup', squads: 'squads', teams: 'teams', store: 'store', howto: 'howto' };
+  const TAB_ORDER = ['home', 'setup', 'squads', 'teams', 'store', 'howto'];
 
   function go(screen) {
     state.confirmClear = false;
+    if (state.sheet) { state.sheet = null; renderSheet(); }
     if (screen === 'setup') {
       // the Play tab resumes whatever is in progress
       if (live) screen = 'match';
@@ -224,7 +242,8 @@
   function back() {
     if (live || (draft && draft.phase === 'spinning')) return;
     if (state.screen === 'teams' && state.db.view) { state.db.view = null; render(); return; }
-    const map = { setup: 'home', draft: 'setup-force', squad: 'draft', squads: 'home', teams: 'home', howto: 'home', trophy: 'home' };
+    if (state.sheet) { closeSheet(); return; }
+    const map = { setup: 'home', draft: 'setup-force', squad: 'draft', squads: 'home', teams: 'home', store: 'home', howto: 'home', trophy: 'home' };
     const to = map[state.screen];
     if (!to) return;
     state.screen = to === 'setup-force' ? 'setup' : to;
@@ -241,6 +260,7 @@
     const hist = loadHistory();
     const titles = hist.filter((h) => h.champion).length;
     $('#profile-sub').textContent = `${titles} Trophi${titles === 1 ? 'y' : 'es'} · ${hist.length} Season${hist.length === 1 ? '' : 's'}`;
+    renderWallet();
 
     screenEl.className = 'screen screen-' + state.screen;
     screenEl.innerHTML = (SCREENS[state.screen] || SCREENS.home)();
@@ -262,7 +282,7 @@
     if (!['home', 'match', 'season'].includes(s)) out.push(hint('B', 'Back', 'back', 'b'));
     if (s === 'draft' && draft) {
       if (draft.phase === 'idle') out.push(hint('S', 'Spin', 'spin', 'y'));
-      if (draft.phase === 'choose') out.push(hint('R', `Reroll (${draft.rerolls})`, draft.rerolls ? 'reroll' : '', 'x'));
+      if (draft.phase === 'choose') out.push(hint('R', `Reroll (${draft.rerolls + wallet.rerolls})`, 'reroll', 'x'));
     }
     if (s === 'match' && live && !live.over) out.push(hint('P', live.paused ? 'Resume' : 'Pause', 'togglePause', 'y'));
     out.push(`<span class="hint-spacer"></span><span class="hint-keys">Arrows navigate &middot; Q / E switch tabs</span>`);
@@ -277,6 +297,7 @@
       <div class="card-kit">${shirt(p.team.kit)}</div>
       <div class="card-name">${esc(shortName(p.name))}</div>
       <div class="card-team"><span class="card-flag">${flag(p.nation)}</span> ${esc(p.team.short)}</div>
+      ${p.ovr >= 90 ? '<div class="card-ribbon">TOTY</div>' : ''}
     </div>`;
   }
 
@@ -337,15 +358,19 @@
           <div class="tile-label"><small>Throwback</small>Retro Mode</div>
         </button>
         ${compTile('wc', 'now', 'Nations')}
-        <button class="tile" data-nav data-key="t-squads" data-action="go" data-arg="squads">
+        <button class="tile tile-squads" data-nav data-key="t-squads" data-action="go" data-arg="squads">
           <div class="tile-art art-stat"><b>${titles}</b><span>Trophies</span><span>${hist.length} seasons played</span></div>
           <div class="tile-label"><small>History</small>My Squads</div>
         </button>
-        <button class="tile" data-nav data-key="t-teams" data-action="go" data-arg="teams">
+        <button class="tile tile-store" data-nav data-key="t-store" data-action="go" data-arg="store">
+          <div class="tile-art art-stat"><b>${fmtNum(wallet.coins)}</b><span>Coins</span><span>${wallet.rerolls} extra reroll${wallet.rerolls === 1 ? '' : 's'}</span></div>
+          <div class="tile-label"><small>Rerolls &amp; more</small>Store</div>
+        </button>
+        <button class="tile tile-db" data-nav data-key="t-teams" data-action="go" data-arg="teams">
           <div class="tile-art art-kits">${DB.now.comps.pl.slice(0, 6).map((t) => shirt(t.kit)).join('')}</div>
           <div class="tile-label"><small>Browse squads</small>Database</div>
         </button>
-        <button class="tile" data-nav data-key="t-howto" data-action="go" data-arg="howto">
+        <button class="tile tile-help" data-nav data-key="t-howto" data-action="go" data-arg="howto">
           <div class="tile-art art-stat"><b>?</b><span>Spins, rerolls</span><span>and seasons</span></div>
           <div class="tile-label"><small>Learn</small>How To Play</div>
         </button>
@@ -415,7 +440,14 @@
   };
 
   function rerollPips() {
-    return `<div class="reroll-pips" title="Rerolls left">${Array.from({ length: REROLLS }, (_, i) => `<i class="${i < draft.rerolls ? 'on' : ''}"></i>`).join('')}<span>${draft.rerolls} reroll${draft.rerolls === 1 ? '' : 's'} left</span></div>`;
+    const extra = wallet.rerolls ? `<b class="extra">+${wallet.rerolls} extra</b>` : '';
+    return `<div class="reroll-pips" title="Rerolls left">${Array.from({ length: REROLLS }, (_, i) => `<i class="${i < draft.rerolls ? 'on' : ''}"></i>`).join('')}<span>${draft.rerolls} free left</span>${extra}</div>`;
+  }
+
+  function rerollButton() {
+    if (draft.rerolls) return `<button class="btn btn-reroll" data-nav data-key="reroll" data-action="reroll"><span class="btn-glyph x">R</span>Reroll<small>${draft.rerolls} free left</small></button>`;
+    if (wallet.rerolls) return `<button class="btn btn-reroll extra" data-nav data-key="reroll" data-action="reroll"><span class="btn-glyph x">R</span>Reroll<small>${wallet.rerolls} extra left</small></button>`;
+    return `<button class="btn btn-reroll buy" data-nav data-key="reroll" data-action="reroll"><span class="btn-glyph x">+</span>Get Rerolls<small>Out of free ones</small></button>`;
   }
 
   function steps(n) {
@@ -464,7 +496,7 @@
       <div class="landed ${draft.justLanded ? 'anim' : ''}">
         <div class="landed-kit">${shirt(t.kit, 'big')}</div>
         <div class="landed-info"><small>You landed on</small><b>${esc(t.name)}</b><span class="muted">${t.type === 'nation' ? flag(t.code) + ' ' : ''}${esc(t.league)} &middot; ${t.strength} avg</span></div>
-        <button class="btn btn-reroll" data-nav data-key="reroll" data-action="reroll" ${draft.rerolls ? '' : 'disabled'}><span class="btn-glyph x">R</span>Reroll<small>${draft.rerolls} left</small></button>
+        ${rerollButton()}
       </div>
       ${selected ? `<div class="place-hint">Now tap a spot on the pitch for <b>${esc(DB[draft.era].players[selected].name)}</b>. <span class="c-n">Green</span> = natural, <span class="c-a">amber</span> = -3, <span class="c-x">red</span> = -10.</div>` : ''}
       <div class="player-list">
@@ -762,6 +794,10 @@
     season.last = { label, results };
     const mine = results.find((r) => r.a === 0 || r.b === 0);
     if (mine) {
+      const outcome = mine.winner === 0 ? 'w' : mine.winner === null ? 'd' : 'l';
+      wallet.coins += COIN_REWARD[outcome];
+      saveWallet();
+      if (!live) toast(`+${COIN_REWARD[outcome]} coins`);
       const home = mine.a === 0;
       season.log.push({ label, opp: season.entries[home ? mine.b : mine.a].name, gf: home ? mine.ga : mine.gb, ga: home ? mine.gb : mine.ga, pens: mine.pens ? (home ? `${mine.pens.a}-${mine.pens.b}` : `${mine.pens.b}-${mine.pens.a}`) : null, won: mine.winner === 0 });
     }
@@ -957,9 +993,12 @@
     const r = live.res;
     const userGoals = userSide === 'a' ? r.ga : r.gb, oppGoals = userSide === 'a' ? r.gb : r.ga;
     const won = r.winner === 0, drew = r.winner === null;
+    const reward = COIN_REWARD[won ? 'w' : drew ? 'd' : 'l'];
     return `<div class="result ${won ? 'win' : drew ? 'draw' : 'lose'}">${won ? 'Win' : drew ? 'Draw' : 'Defeat'}</div>
       <div class="muted center">${userGoals} - ${oppGoals}${r.pens ? ' (pens)' : ''}</div>
-      <button class="btn btn-primary wide" data-nav data-key="continue" data-action="leaveMatch" data-autofocus>Continue</button>`;
+      <div class="coin-gain"><i class="coin"></i>+${reward} coins</div>
+      <button class="btn btn-primary wide" data-nav data-key="continue" data-action="leaveMatch" data-autofocus>Continue</button>
+      ${adSlot()}`;
   }
 
   SCREENS.match = () => {
@@ -1042,8 +1081,8 @@
         <div class="nx">${side(A, true)}<div class="nx-vs">VS</div>${side(B, false)}</div>
         <button class="btn btn-primary wide" data-nav data-key="watch" data-action="watchMatch" data-autofocus>Play Match</button>
         <div class="btn-pair">
-          <button class="btn" data-nav data-key="quick" data-action="quickMatch">Quick Sim</button>
-          <button class="btn" data-nav data-key="simend" data-action="simToEnd">Sim To End</button>
+          <button class="btn btn-orange" data-nav data-key="quick" data-action="quickMatch">Quick Sim</button>
+          <button class="btn btn-violet" data-nav data-key="simend" data-action="simToEnd">Sim To End</button>
         </div>
         <p class="muted center small-note">Play Match runs live at ${state.speed} speed (about ${Math.round((SPEEDS[state.speed] * 90) / 1000)}s).</p>
       </section>`;
@@ -1052,7 +1091,7 @@
     return `<div class="page">
       ${head}
       <div class="season-grid">
-        <div>${main}${lastResultsHTML()}${formHTML()}</div>
+        <div>${main}${adSlot()}${lastResultsHTML()}${formHTML()}</div>
         <div>${season.stage === 'ko' ? bracketHTML() : ''}${tablesHTML()}</div>
       </div>
     </div>`;
@@ -1122,6 +1161,106 @@
     return `<section class="panel"><h2 class="panel-title">Knockouts</h2><div class="bracket-cols">${[...done, ...next].join('')}</div></section>`;
   }
 
+  // house ads fill the ad slots until a real ad network is connected
+  const HOUSE_ADS = [
+    ['Out of rerolls?', 'Grab 10 extra rerolls for $2.49.', 'Shop Rerolls'],
+    ['Tired of banners?', 'Go ad-free for $2.99, once and done.', 'Remove Ads'],
+    ['Retro 14/15 is live', 'Draft prime Ronaldo, Messi and Robben.', 'Play Retro'],
+  ];
+  let adTurn = Math.floor(Math.random() * HOUSE_ADS.length);
+  function adSlot() {
+    if (wallet.noAds) return '';
+    const [title, body, cta] = HOUSE_ADS[adTurn++ % HOUSE_ADS.length];
+    const action = cta === 'Play Retro' ? 'data-action="quickSetup" data-arg="pl|retro"' : 'data-action="go" data-arg="store"';
+    return `<aside class="ad-slot"><span class="ad-label">Ad</span><div class="ad-body"><b>${title}</b><span>${body}</span></div>
+      <button class="btn btn-ad" data-nav data-key="ad-cta" ${action}>${cta}</button></aside>`;
+  }
+
+  function productCard(id, owned) {
+    const pr = PRODUCTS[id];
+    const cost = pr.coins ? `<span class="price coins"><i class="coin"></i>${fmtNum(pr.coins)}</span>` : `<span class="price">${pr.price}</span>`;
+    return `<div class="product p-${pr.color}">
+      ${pr.tag ? `<span class="p-tag">${pr.tag}</span>` : ''}
+      <div class="p-icon">${id === 'noads' ? '<span class="p-noads">AD</span>' : `<span class="p-count">+${pr.amount}</span>`}</div>
+      <b class="p-name">${pr.name}</b><span class="p-desc">${pr.desc}</span>
+      ${owned ? '<span class="price owned">Owned</span>' : cost}
+      <button class="btn btn-buy" data-nav data-key="buy-${id}" data-action="buy" data-arg="${id}" ${owned ? 'disabled' : ''}>${owned ? 'Active' : pr.coins ? 'Buy With Coins' : 'Buy'}</button>
+    </div>`;
+  }
+
+  SCREENS.store = () => `<div class="page">
+    <h1 class="page-title">Store</h1>
+    <div class="wallet-row">
+      <div class="wallet-box w-coins"><small>Coins</small><b><i class="coin"></i>${fmtNum(wallet.coins)}</b><span>Win ${COIN_REWARD.w} &middot; Draw ${COIN_REWARD.d} &middot; Loss ${COIN_REWARD.l} &middot; Trophy ${fmtNum(COIN_REWARD.title)}</span></div>
+      <div class="wallet-box w-rerolls"><small>Extra rerolls</small><b>${wallet.rerolls}</b><span>Used after your 5 free ones run out</span></div>
+      <div class="wallet-box w-ads"><small>Ads</small><b>${wallet.noAds ? 'Off' : 'On'}</b><span>${wallet.noAds ? 'Thanks for your support' : 'Remove them below'}</span></div>
+    </div>
+    <section class="panel"><h2 class="panel-title">Reroll Packs</h2>
+      <div class="product-grid">${['r3', 'r10', 'r25'].map((id) => productCard(id)).join('')}</div></section>
+    <section class="panel"><h2 class="panel-title">Coin Shop</h2>
+      <div class="product-grid">${['c1', 'c5'].map((id) => productCard(id)).join('')}</div></section>
+    <section class="panel"><h2 class="panel-title">Ad-Free</h2>
+      <div class="product-grid">${productCard('noads', wallet.noAds)}</div></section>
+    <p class="muted small-note">Demo store: purchases are free for now and saved on this device. No payment details are collected.</p>
+  </div>`;
+
+  // ----- bottom sheet (checkout and quick reroll top-up) -----
+  function openSheet(sheet) { state.sheet = sheet; renderSheet(); }
+  function closeSheet() { state.sheet = null; renderSheet(); }
+
+  function renderSheet() {
+    const el = $('#sheet');
+    const sh = state.sheet;
+    if (!sh) { el.hidden = true; el.innerHTML = ''; return; }
+    let inner;
+    if (sh.type === 'rerolls') {
+      inner = `<h2 class="panel-title">Out Of Rerolls</h2>
+        <p class="lead">Your 5 free rerolls are used. Top up to keep spinning, or pick a player from this team.</p>
+        <div class="product-grid compact">${['c1', 'c5', 'r3', 'r10'].map((id) => productCard(id)).join('')}</div>
+        <button class="btn wide" data-nav data-key="sheet-close" data-action="closeSheet">Keep This Team</button>`;
+    } else {
+      const pr = PRODUCTS[sh.id];
+      inner = `<h2 class="panel-title">Checkout</h2>
+        <div class="checkout-line"><b>${pr.name}</b><span class="price">${pr.price}</span></div>
+        <p class="muted">${pr.desc}</p>
+        <p class="demo-note">Demo mode: tapping Confirm gives you the item. You won't be charged.</p>
+        <div class="btn-pair">
+          <button class="btn" data-nav data-key="sheet-cancel" data-action="closeSheet">Cancel</button>
+          <button class="btn btn-primary" data-nav data-key="sheet-confirm" data-action="confirmBuy" data-arg="${sh.id}" data-autofocus>Confirm ${pr.price}</button>
+        </div>`;
+    }
+    el.hidden = false;
+    el.innerHTML = `<div class="sheet-backdrop" data-action="closeSheet"></div><div class="sheet panel" role="dialog" aria-modal="true">${inner}</div>`;
+    const f = el.querySelector('[data-autofocus]') || el.querySelector('.btn');
+    if (f) f.focus({ preventScroll: true });
+  }
+
+  function grant(id) {
+    const pr = PRODUCTS[id];
+    if (id === 'noads') wallet.noAds = true;
+    else wallet.rerolls += pr.amount;
+    saveWallet();
+    toast(id === 'noads' ? 'Ads removed' : `+${pr.amount} reroll${pr.amount > 1 ? 's' : ''} added`);
+  }
+
+  function buy(id) {
+    const pr = PRODUCTS[id];
+    if (pr.coins) {
+      if (wallet.coins < pr.coins) { toast(`You need ${fmtNum(pr.coins - wallet.coins)} more coins. Win matches to earn them.`); return; }
+      wallet.coins -= pr.coins;
+      grant(id);
+      state.sheet = null;
+      renderSheet();
+      render();
+      return;
+    }
+    openSheet({ type: 'checkout', id });
+  }
+
+  function renderWallet() {
+    $('#wallet').innerHTML = `<button class="wallet-chip" data-action="go" data-arg="store" aria-label="Store: ${wallet.coins} coins, ${wallet.rerolls} extra rerolls"><i class="coin"></i>${fmtNum(wallet.coins)}<span class="wc-sep"></span><span class="wc-r">&#8635;</span>${wallet.rerolls}</button>`;
+  }
+
   SCREENS.trophy = () => {
     const h = state.lastResult;
     return `<div class="page center-page">
@@ -1183,7 +1322,7 @@
       <section class="panel"><h2 class="panel-title">1 &middot; Pick a competition</h2><p>Premier League, Champions League or World Cup, in today's squads or Retro 2014/15. Then pick a formation.</p></section>
       <section class="panel"><h2 class="panel-title">2 &middot; Spin</h2><p>The wheel lands on a random team from that competition. You draft one of their players.</p></section>
       <section class="panel"><h2 class="panel-title">3 &middot; Pick the position</h2><p>Choose a player, then tap where they play on the pitch. Natural spot: full rating. Similar spot: -3. Wrong spot: -10.</p></section>
-      <section class="panel"><h2 class="panel-title">4 &middot; Reroll (free)</h2><p>Don't like the team you landed on? You get <b class="accent">${REROLLS} rerolls</b> per draft. Free, always.</p></section>
+      <section class="panel"><h2 class="panel-title">4 &middot; Reroll</h2><p>Don't like the team you landed on? You get <b class="accent">${REROLLS} free rerolls</b> per draft. Need more? Get extras in the Store, with coins you earn from matches.</p></section>
       <section class="panel"><h2 class="panel-title">5 &middot; Play the season</h2><p>Your XI replaces the weakest team in the competition. Watch every match live, or sim ahead.</p></section>
       <section class="panel"><h2 class="panel-title">6 &middot; Formats</h2><p>Premier League: one round of fixtures. Champions League: the 8-game league phase (or 2014/15 groups), then knockouts. World Cup: groups, then knockouts.</p></section>
     </div>
@@ -1235,8 +1374,9 @@
 
   function reroll() {
     if (!draft || draft.phase !== 'choose') return;
-    if (draft.rerolls <= 0) { toast('No rerolls left. Pick a player.'); return; }
-    draft.rerolls--;
+    if (draft.rerolls > 0) draft.rerolls--;
+    else if (wallet.rerolls > 0) { wallet.rerolls--; draft.extraUsed = (draft.extraUsed || 0) + 1; saveWallet(); }
+    else { openSheet({ type: 'rerolls' }); return; }
     spin(true);
   }
 
@@ -1294,6 +1434,7 @@
     if (!season) return;
     if (live) { clearTimeout(live.timer); live = null; }
     const champion = season.done && season.champion === 0;
+    if (champion) { wallet.coins += COIN_REWARD.title; saveWallet(); toast(`Trophy bonus: +${fmtNum(COIN_REWARD.title)} coins`); }
     let result;
     if (season.fmt === 'league' && season.done) result = `${champion ? 'Champions! ' : ''}Finished ${ordinal(season.position)} with ${season.table[0].pts} pts`;
     else if (champion) {
@@ -1304,7 +1445,7 @@
     const entry = {
       name: draft.name, formation: draft.formation, rating: st.rating, champion, result,
       compName: COMPS[season.comp].name, compShort: COMPS[season.comp].short, eraLabel: DB[season.era].label,
-      rerollsUsed: REROLLS - draft.rerolls, date: new Date().toLocaleDateString(),
+      rerollsUsed: REROLLS - draft.rerolls + (draft.extraUsed || 0), date: new Date().toLocaleDateString(),
       stars: draft.slots.map((s) => s.player).sort((a, b) => b.ovr - a.ovr).slice(0, 3).map((p) => shortName(p.name)),
     };
     saveHistory([entry, ...loadHistory()]);
@@ -1377,6 +1518,9 @@
     dbComp: (c) => { state.db.comp = c; render(); },
     viewTeam: (id) => { state.db.view = id; render(true); },
     // tap twice to confirm (pop-up dialogs are not available everywhere)
+    buy,
+    confirmBuy: (id) => { grant(id); state.sheet = null; renderSheet(); render(); },
+    closeSheet,
     clearHistory: () => {
       if (state.confirmClear) { saveHistory([]); state.confirmClear = false; } else state.confirmClear = true;
       render();
@@ -1384,6 +1528,7 @@
   };
 
   document.addEventListener('click', (e) => {
+    if (state.sheet && !e.target.closest('#sheet')) return;
     const tab = e.target.closest('.tab');
     if (tab) { switchTab(tab.dataset.tab); return; }
     const el = e.target.closest('[data-action]');
@@ -1406,7 +1551,8 @@
 
   // ---------- keyboard / spatial nav ----------
   function moveFocus(dir) {
-    const els = [...screenEl.querySelectorAll('[data-nav]')].filter((e) => !e.disabled && e.tabIndex !== -1 && e.offsetParent !== null);
+    const root = state.sheet ? $('#sheet') : screenEl;
+    const els = [...root.querySelectorAll('[data-nav]')].filter((e) => !e.disabled && e.tabIndex !== -1 && e.offsetParent !== null);
     if (!els.length) return;
     const cur = document.activeElement;
     if (!els.includes(cur)) { els[0].focus(); return; }

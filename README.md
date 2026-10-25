@@ -24,7 +24,10 @@ Your XI takes the place of the lowest-rated team in the competition.
 - **Rerolls:** 5 per draft, free. A reroll re-spins the team for the current pick.
 - **Team rating** is the average of your XI after position penalties. There's no chemistry.
 - **Matches:** play live (about a minute per match at normal speed, with commentary, a ball tracker and other scores coming in), or quick sim / sim to the end. Speed can be set to slow, normal or fast, and you can pause.
-- Results are saved under My Squads (browser local storage).
+- **Coins:** earned from every match (win 100, draw 40, loss 15) plus 1,000 for a trophy.
+- **Store:** extra reroll packs (with coins or money) that kick in after your 5 free rerolls, and Remove Ads. Purchases currently run in demo mode: nothing is charged. Real billing needs a payment provider (for example Stripe) and a small server, or app store billing if NextHalf is wrapped as a phone app; the hook for it is `buy()` in `js/app.js`.
+- **Ads:** banner slots on the season and match screens show NextHalf's own promos until a real ad network is connected. Remove Ads hides them.
+- Results, coins and purchases are saved in the browser (local storage), per device.
 
 Keyboard: arrows to move, Enter to select, Esc to go back, S to spin, R to reroll, P to pause a match, Q / E to switch tabs.
 
