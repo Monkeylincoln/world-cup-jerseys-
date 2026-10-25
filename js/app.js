@@ -105,9 +105,9 @@
     const toty = new Set(E.toty || []);
     all.forEach((t) => {
       t.players = t.players.split(';').map((s) => {
-        const [name, pos, ovr, nat] = s.split(',');
+        const [name, pos, ovr, nat, card] = s.split(',');
         best[name] = Math.max(best[name] || 0, +ovr);
-        return { uid: `${era}:${t.id}:${name}`, name, pos, ovr: +ovr, nation: t.type === 'nation' ? t.code : nat, team: t };
+        return { uid: `${era}:${t.id}:${name}`, name, card: card || shortName(name), pos, ovr: +ovr, nation: t.type === 'nation' ? t.code : nat, team: t };
       });
     });
     all.forEach((t) => {
@@ -118,7 +118,7 @@
       teams[t.id] = t;
     });
     DB[era] = {
-      label: E.label, teams, players,
+      label: E.label, game: E.game, teams, players,
       comps: { pl: E.comps.pl.map((id) => teams[id]), ucl: E.comps.ucl.map((id) => teams[id]), wc: E.nations.map((t) => teams[t.id]) },
     };
   }
@@ -139,7 +139,7 @@
       league: `${n} clubs. Play every other side once.`,
       swiss: `${n} clubs. 8-game league phase, then knockouts.`,
       groups8: `${n} clubs. 8 groups of 4, then knockouts.`,
-      wc: `${n} nations. 4 groups of 4, then knockouts.`,
+      wc: `Top 16 of ${n} nations. 4 groups of 4, then knockouts.`,
     }[compFormat(comp, era)];
   }
 
@@ -296,7 +296,7 @@
       <div class="card-shine"></div>
       <div class="card-top"><div class="card-ovr">${ovr}</div><div class="card-pos">${pos}</div></div>
       <div class="card-kit">${shirt(p.team.kit)}</div>
-      <div class="card-name">${esc(shortName(p.name))}</div>
+      <div class="card-name">${esc(p.card)}</div>
       <div class="card-team"><span class="card-flag">${flag(p.nation)}</span> ${esc(p.team.short)}</div>
       ${p.toty ? '<div class="card-ribbon">TOTY</div>' : ''}
     </div>`;
@@ -352,8 +352,8 @@
           <div class="tile-badge">5 free rerolls</div>
           <div class="tile-label"><small>${resume ? 'Continue' : 'Play'}</small>${resume ? 'Resume' : 'Draft Mode'}</div>
         </button>
-        ${compTile('pl', 'now', '2025/26')}
-        ${compTile('ucl', 'now', '2025/26')}
+        ${compTile('pl', 'now', DB.now.label)}
+        ${compTile('ucl', 'now', DB.now.label)}
         <button class="tile tile-retro" data-nav data-key="t-retro" data-action="quickSetup" data-arg="pl|retro">
           <div class="tile-art art-stat"><b>14/15</b><span>Squads &amp; ratings</span><span>from 2015</span></div>
           <div class="tile-label"><small>Throwback</small>Retro Mode</div>
@@ -394,8 +394,8 @@
       <section class="panel">
         <h2 class="panel-title">Era</h2>
         <div class="chip-row">
-          ${chip('setEra', 'now', s.era === 'now', '2025/26', 'Current squads', 'era-now')}
-          ${chip('setEra', 'retro', s.era === 'retro', 'Retro 2014/15', 'Squads as they were in 2015', 'era-retro')}
+          ${chip('setEra', 'now', s.era === 'now', DB.now.label, `Current squads, ${DB.now.game} ratings`, 'era-now')}
+          ${chip('setEra', 'retro', s.era === 'retro', `Retro ${DB.retro.label}`, `2015 squads, ${DB.retro.game} ratings`, 'era-retro')}
         </div>
       </section>
       <section class="panel">
@@ -1306,8 +1306,8 @@
     return `<div class="page">
       <h1 class="page-title">Database</h1>
       <div class="chip-row small">
-        ${chip('dbEra', 'now', d.era === 'now', '2025/26', '', 'dbe-now')}
-        ${chip('dbEra', 'retro', d.era === 'retro', 'Retro 14/15', '', 'dbe-retro')}
+        ${chip('dbEra', 'now', d.era === 'now', `${DB.now.label} (${DB.now.game})`, '', 'dbe-now')}
+        ${chip('dbEra', 'retro', d.era === 'retro', `Retro 14/15 (${DB.retro.game})`, '', 'dbe-retro')}
       </div>
       <div class="chip-row small">
         ${['pl', 'ucl', 'wc'].map((c) => chip('dbComp', c, d.comp === c, COMPS[c].name, '', 'dbc-' + c)).join('')}
@@ -1447,7 +1447,7 @@
       name: draft.name, formation: draft.formation, rating: st.rating, champion, result,
       compName: COMPS[season.comp].name, compShort: COMPS[season.comp].short, eraLabel: DB[season.era].label,
       rerollsUsed: REROLLS - draft.rerolls + (draft.extraUsed || 0), date: new Date().toLocaleDateString(),
-      stars: draft.slots.map((s) => s.player).sort((a, b) => b.ovr - a.ovr).slice(0, 3).map((p) => shortName(p.name)),
+      stars: draft.slots.map((s) => s.player).sort((a, b) => b.ovr - a.ovr).slice(0, 3).map((p) => p.card),
     };
     saveHistory([entry, ...loadHistory()]);
     state.lastResult = entry;

@@ -10,7 +10,7 @@ It's built for phones too: the layout adapts to small screens, works with touch,
 
 ## Modes
 
-| Competition | 2025/26 | Retro 2014/15 |
+| Competition | 2026/27 (FC 27 ratings) | Retro 2014/15 (FIFA 15 ratings) |
 | --- | --- | --- |
 | Premier League | 20 clubs, one round of fixtures (19 matchdays) | 20 clubs from 2014/15 |
 | Champions League | 36 clubs, 8-game league phase, play-off, then knockouts | 32 clubs, 8 groups of 4, then knockouts |
@@ -36,8 +36,12 @@ Keyboard: arrows to move, Enter to select, Esc to go back, S to spin, R to rerol
 - `index.html` page shell
 - `css/style.css` FIFA 15 style theme (and the retro theme)
 - `js/data.js` formations and position rules
-- `js/data-now.js` 2025/26 clubs and nations
+- `js/data-now.js` 2026/27 clubs and nations (generated, see below)
 - `js/data-retro.js` 2014/15 clubs and nations
 - `js/app.js` draft, season and match logic
 
-Player ratings are rough estimates for the game, not official data. Edit the data files to update squads or ratings.
+## Ratings
+
+- **2026/27** squads and ratings come from EA SPORTS FC 27 (EA's official ratings data, snapshot 2026-09-12, via the community dataset [LakshmiKanth11/EA_FC_ANALYSIS](https://github.com/LakshmiKanth11/EA_FC_ANALYSIS)). Each club gets its top 16 players balanced by position; national teams take the best players of that nationality. The Premier League is the real 2026/27 division and the Champions League is the 2026/27 field, minus Sabah and Slovan Bratislava, which are not in FC 27. Regenerate with `python3 tools/gen_now.py <players.csv> js/data-now.js`.
+- **Retro 2014/15** uses FIFA 15 ratings: launch Ultimate Team ratings ([kafagy/fifa-FUT-Data](https://github.com/kafagy/fifa-FUT-Data)), with keepers and a few missing players from FIFA 15 season data ([lbenz730/fifa_model](https://github.com/lbenz730/fifa_model)). Clubs and leagues that were not in FIFA 15 (Ludogorets, APOEL, Maribor, BATE, a few national-team-only players) keep estimated ratings. `tools/match.py` and `tools/alias_retro.json` do the name matching.
+- The special TOTY card design is limited to the 13 players listed under `toty` in each data file.
