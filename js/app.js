@@ -226,7 +226,6 @@
   const state = {
     screen: 'home',
     setup: { era: 'now', comp: 'pl', formation: '4-3-3' },
-    db: { era: 'now', comp: 'pl', view: null },
     speed: SPEEDS[store(SPEED_KEY)] ? store(SPEED_KEY) : 'normal',
     lastResult: null,
   };
@@ -235,7 +234,7 @@
   let season = null;
   let live = null;
 
-  const currentEra = () => (season ? season.era : draft ? draft.era : state.screen === 'teams' ? state.db.era : state.setup.era);
+  const currentEra = () => (season ? season.era : draft ? draft.era : state.setup.era);
 
   // The draft and season in progress are saved after every change, so a reload or crash never loses them.
   function saveCurrent() {
@@ -286,8 +285,8 @@
   }
 
   // ---------- navigation ----------
-  const TAB_FOR = { home: 'home', setup: 'setup', draft: 'setup', squad: 'setup', season: 'setup', match: 'setup', trophy: 'setup', squads: 'squads', teams: 'teams', store: 'store', howto: 'howto' };
-  const TAB_ORDER = ['home', 'setup', 'squads', 'teams', 'store', 'howto'];
+  const TAB_FOR = { home: 'home', setup: 'setup', draft: 'setup', squad: 'setup', season: 'setup', match: 'setup', trophy: 'setup', squads: 'squads', store: 'store', howto: 'howto' };
+  const TAB_ORDER = ['home', 'setup', 'squads', 'store', 'howto'];
 
   function go(screen) {
     state.confirmClear = false;
@@ -305,9 +304,8 @@
 
   function back() {
     if (live || (draft && draft.phase === 'spinning')) return;
-    if (state.screen === 'teams' && state.db.view) { state.db.view = null; render(); return; }
     if (state.sheet) { closeSheet(); return; }
-    const map = { setup: 'home', draft: 'setup-force', squad: 'draft', squads: 'home', teams: 'home', store: 'home', howto: 'home', trophy: 'home' };
+    const map = { setup: 'home', draft: 'setup-force', squad: 'draft', squads: 'home', store: 'home', howto: 'home', trophy: 'home' };
     const to = map[state.screen];
     if (!to) return;
     state.screen = to === 'setup-force' ? 'setup' : to;
@@ -432,10 +430,6 @@
         <button class="tile tile-store" data-nav data-key="t-store" data-action="go" data-arg="store">
           <div class="tile-art art-stat"><b>${fmtNum(wallet.coins)}</b><span>Coins</span><span>${wallet.rerolls} reroll${wallet.rerolls === 1 ? '' : 's'} saved</span></div>
           <div class="tile-label"><small>Rerolls &amp; more</small>Store</div>
-        </button>
-        <button class="tile tile-db" data-nav data-key="t-teams" data-action="go" data-arg="teams">
-          <div class="tile-art art-kits">${DB.now.comps.pl.slice(0, 6).map((t) => shirt(t.kit)).join('')}</div>
-          <div class="tile-label"><small>Browse squads</small>Database</div>
         </button>
         <button class="tile tile-help" data-nav data-key="t-howto" data-action="go" data-arg="howto">
           <div class="tile-art art-stat"><b>?</b><span>Spins, rerolls</span><span>and seasons</span></div>
@@ -981,6 +975,8 @@
     live.over = true;
     const A = season.entries[live.f.a], B = season.entries[live.f.b];
     live.feed.unshift({ min: 'FT', text: `Full time: ${A.name} ${live.ga} - ${live.gb} ${B.name}.`, cls: 'sys' });
+    // a level knockout match goes to a shootout you take yourself; the round is saved once it ends
+    if (live.f.ko && live.ga === live.gb) { startShootout(); return; }
     const p = live.res.pens;
     if (p) {
       live.feed.unshift({ min: 'PEN', text: `Shoot-out: ${p.seq.map(([s, g]) => `${(s === 'a' ? A : B).short} ${g ? '✔' : '✖'}`).join('  ')}`, cls: 'sys' });
@@ -988,6 +984,235 @@
     }
     live.others.forEach((o) => { o.ga = o.r.ga; o.gb = o.r.gb; });
     commitMatchday([live.res, ...live.others.map((o) => o.r)]);
+  }
+
+  // ---------- penalty shootout ----------
+  // Zones are 0-5: top row L/C/R, then bottom row L/C/R. Columns: 0 left, 1 centre, 2 right.
+  const PK_X = [17, 50, 83];
+  const PK_Y = [27, 70];
+  const PK_KEEPER_PICK = [0.4, 0.2, 0.4];
+
+  function startShootout() {
+    const userSide = live.f.a === 0 ? 'a' : 'b';
+    const user = season.entries[0];
+    const opp = season.entries[userSide === 'a' ? live.f.b : live.f.a];
+    const takers = (team) => team.scorers.slice().sort((x, y) => y.w - x.w).map((p) => shortName(p.name));
+    const userFirst = Math.random() < 0.5;
+    live.shootout = { userSide, userFirst, kicks: [], takersU: takers(user), takersO: takers(opp), oppName: opp.name, oppKit: opp.kit, userKit: user.kit, phase: null, power: 0 };
+    live.feed.unshift({ min: 'PEN', text: `Penalties! ${userFirst ? 'You won the toss and shoot first.' : `${opp.name} won the toss and shoot first.`}`, cls: 'sys' });
+    pkNext();
+    render();
+  }
+
+  function pkCounts() {
+    const k = live.shootout.kicks;
+    const u = k.filter((x) => x.side === 'u'), o = k.filter((x) => x.side === 'o');
+    return { ku: u.length, ko: o.length, su: u.filter((x) => x.scored).length, so: o.filter((x) => x.scored).length };
+  }
+
+  function pkDecided() {
+    const { ku, ko, su, so } = pkCounts();
+    if (ku < 5 || ko < 5) return su > so + (5 - ko) || so > su + (5 - ku);
+    return ku === ko && su !== so; // sudden death
+  }
+
+  function pkNext() {
+    const sh = live.shootout;
+    if (pkDecided()) { pkEnd(); return; }
+    const first = sh.userFirst ? 'u' : 'o';
+    const turn = sh.kicks.length % 2 === 0 ? first : first === 'u' ? 'o' : 'u';
+    const { ku, ko } = pkCounts();
+    sh.turn = turn;
+    sh.anim = null;
+    if (turn === 'u') {
+      sh.taker = sh.takersU[ku % sh.takersU.length];
+      sh.phase = 'aim';
+      sh.msg = `${sh.taker} steps up. Pick your spot.`;
+    } else {
+      sh.taker = sh.takersO[ko % sh.takersO.length];
+      sh.phase = 'dive';
+      sh.msg = `${sh.taker} steps up for ${sh.oppName}. Which way do you dive?`;
+    }
+  }
+
+  function pkAim(zone) {
+    const sh = live.shootout;
+    if (!sh || sh.phase !== 'aim') return;
+    sh.zone = +zone;
+    sh.phase = 'power';
+    sh.msg = 'Stop the meter in the green.';
+    sh.power = 0;
+    sh.dir = 1;
+    renderShootout();
+    const top = sh.zone < 3;
+    const loop = () => {
+      if (!live || !live.shootout || live.shootout.phase !== 'power') return;
+      // top corners: a faster meter and a smaller sweet spot
+      sh.power += sh.dir * (top ? 2.7 : 2.1);
+      if (sh.power >= 100) { sh.power = 100; sh.dir = -1; }
+      if (sh.power <= 0) { sh.power = 0; sh.dir = 1; }
+      const m = $('#pk-marker');
+      if (m) m.style.left = sh.power + '%';
+      sh.raf = requestAnimationFrame(loop);
+    };
+    sh.raf = requestAnimationFrame(loop);
+  }
+
+  function pkQuality(power, top) {
+    const off = Math.abs(power - 50);
+    const green = top ? 7 : 10, amber = top ? 17 : 22;
+    return off <= green ? 'perfect' : off <= amber ? 'ok' : 'miss';
+  }
+
+  function pkShoot() {
+    const sh = live.shootout;
+    if (!sh || sh.phase !== 'power') return;
+    cancelAnimationFrame(sh.raf);
+    const col = sh.zone % 3, top = sh.zone < 3;
+    const q = pkQuality(sh.power, top);
+    const keeper = weightedIndex(PK_KEEPER_PICK);
+    let scored, text;
+    if (q === 'miss') {
+      scored = false;
+      text = top ? `${sh.taker} blazes it over the bar!` : `${sh.taker} drags it wide!`;
+      sh.anim = { x: top ? PK_X[col] : col === 1 ? 62 : col === 0 ? -8 : 108, y: top ? -14 : PK_Y[1], keeper };
+    } else {
+      const saveChance = keeper !== col ? 0 : col === 1 ? (top ? 0.35 : 0.85) : top ? (q === 'perfect' ? 0.15 : 0.45) : (q === 'perfect' ? 0.5 : 0.8);
+      scored = Math.random() >= saveChance;
+      text = scored ? (q === 'perfect' && top ? `${sh.taker} picks out the top corner!` : `${sh.taker} scores!`) : `Saved! The keeper reads ${sh.taker}.`;
+      sh.anim = { x: PK_X[col], y: PK_Y[top ? 0 : 1], keeper, keeperTop: top };
+    }
+    pkResolve('u', scored, text);
+  }
+
+  function pkDive(col) {
+    const sh = live.shootout;
+    if (!sh || sh.phase !== 'dive') return;
+    col = +col;
+    const shotCol = weightedIndex([0.38, 0.24, 0.38]);
+    const top = Math.random() < 0.45;
+    let scored, text;
+    if (Math.random() < 0.08) {
+      scored = false;
+      text = top ? `${sh.taker} fires it over!` : `${sh.taker} hits the post!`;
+      sh.anim = { x: top ? PK_X[shotCol] : shotCol === 0 ? 3 : shotCol === 2 ? 97 : 50, y: top ? -14 : PK_Y[1], keeper: col, user: true };
+    } else {
+      const saveChance = col !== shotCol ? 0 : shotCol === 1 ? 0.7 : top ? 0.3 : 0.6;
+      scored = Math.random() >= saveChance;
+      text = scored ? `${sh.taker} scores for ${sh.oppName}.` : `SAVED! You keep out ${sh.taker}!`;
+      sh.anim = { x: PK_X[shotCol], y: PK_Y[top ? 0 : 1], keeper: col, keeperTop: top, user: true };
+    }
+    pkResolve('o', scored, text);
+  }
+
+  function weightedIndex(weights) {
+    let r = Math.random() * weights.reduce((a, b) => a + b, 0);
+    for (let i = 0; i < weights.length; i++) { r -= weights[i]; if (r <= 0) return i; }
+    return weights.length - 1;
+  }
+
+  function pkResolve(side, scored, text) {
+    const sh = live.shootout;
+    sh.phase = 'anim';
+    sh.msg = '';
+    renderShootout();
+    // kick the ball and dive on the next frame so the transitions run
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      const ball = $('#pk-ball'), kp = $('#pk-keeper');
+      if (ball) { ball.style.left = sh.anim.x + '%'; ball.style.top = sh.anim.y + '%'; ball.classList.add('kicked'); }
+      if (kp) kp.className = `pk-keeper dive-${['l', 'c', 'r'][sh.anim.keeper]}${sh.anim.keeperTop ? ' high' : ''}`;
+    }));
+    setTimeout(() => {
+      if (!live || live.shootout !== sh) return;
+      sh.kicks.push({ side, scored, taker: sh.taker });
+      sh.msg = text;
+      sh.flash = scored ? (side === 'u' ? 'good' : 'bad') : side === 'u' ? 'bad' : 'good';
+      live.feed.unshift({ min: 'PEN', text, cls: (scored ? 'goal ' : '') + 'side-' + (side === 'u' ? sh.userSide : sh.userSide === 'a' ? 'b' : 'a') });
+      sh.phase = 'between';
+      renderShootout();
+      setTimeout(() => {
+        if (!live || live.shootout !== sh) return;
+        sh.flash = null;
+        pkNext();
+        renderShootout();
+      }, 1300);
+    }, 900);
+  }
+
+  function pkEnd() {
+    const sh = live.shootout;
+    const { su, so } = pkCounts();
+    const userWon = su > so;
+    const oppIdx = live.f.a === 0 ? live.f.b : live.f.a;
+    const mine = (side) => (side === 'u' ? sh.userSide : sh.userSide === 'a' ? 'b' : 'a');
+    live.res.pens = {
+      a: sh.userSide === 'a' ? su : so,
+      b: sh.userSide === 'a' ? so : su,
+      seq: sh.kicks.map((k) => [mine(k.side), k.scored]),
+    };
+    live.res.winner = userWon ? 0 : oppIdx;
+    sh.phase = 'done';
+    sh.msg = userWon ? `You win ${su}-${so} on penalties!` : `${sh.oppName} win ${so}-${su} on penalties.`;
+    live.feed.unshift({ min: 'PEN', text: sh.msg, cls: 'goal side-' + (userWon ? sh.userSide : sh.userSide === 'a' ? 'b' : 'a') });
+    live.others.forEach((o) => { o.ga = o.r.ga; o.gb = o.r.gb; });
+    commitMatchday([live.res, ...live.others.map((o) => o.r)]);
+    render();
+  }
+
+  function pkTally(side) {
+    const sh = live.shootout;
+    const ks = sh.kicks.filter((k) => k.side === side);
+    const slots = Math.max(5, ks.length);
+    const dots = Array.from({ length: slots }, (_, i) => {
+      const k = ks[i];
+      return `<i class="${k ? (k.scored ? 'in' : 'out') : ''}">${k ? (k.scored ? '&#10003;' : '&#10007;') : ''}</i>`;
+    }).join('');
+    const name = side === 'u' ? season.entries[0].short : season.entries[live.f.a === 0 ? live.f.b : live.f.a].short;
+    return `<div class="pk-row ${side === 'u' ? 'me' : ''}"><b>${esc(name)}</b><div class="pk-dots">${dots}</div><span>${ks.filter((k) => k.scored).length}</span></div>`;
+  }
+
+  function shootoutHTML() {
+    const sh = live.shootout;
+    const shooting = sh.turn === 'u';
+    const keeperKit = shooting ? sh.oppKit : sh.userKit;
+    const zones = sh.phase === 'aim'
+      ? `<div class="pk-zones">${[0, 1, 2, 3, 4, 5].map((z) => `<button class="pk-zone" data-nav data-key="pk-z${z}" data-action="pkAim" data-arg="${z}" aria-label="${['Top left', 'Top centre', 'Top right', 'Bottom left', 'Bottom centre', 'Bottom right'][z]}" ${z === 3 ? 'data-autofocus' : ''}></button>`).join('')}</div>`
+      : '';
+    const target = sh.phase === 'power' ? `<span class="pk-target" style="left:${PK_X[sh.zone % 3]}%;top:${PK_Y[sh.zone < 3 ? 0 : 1]}%"></span>` : '';
+    let controls = '';
+    if (sh.phase === 'power') {
+      const top = sh.zone < 3;
+      controls = `<div class="pk-meter ${top ? 'top' : ''}"><span class="pk-band"></span><span class="pk-marker" id="pk-marker" style="left:${sh.power}%"></span></div>
+        <button class="btn btn-primary wide" data-nav data-key="pk-shoot" data-action="pkShoot" data-autofocus>Shoot!</button>`;
+    } else if (sh.phase === 'dive') {
+      controls = `<div class="pk-dive">
+        <button class="btn" data-nav data-key="pk-d0" data-action="pkDive" data-arg="0">&#8592; Dive Left</button>
+        <button class="btn" data-nav data-key="pk-d1" data-action="pkDive" data-arg="1" data-autofocus>Stay Centre</button>
+        <button class="btn" data-nav data-key="pk-d2" data-action="pkDive" data-arg="2">Dive Right &#8594;</button></div>`;
+    } else if (sh.phase === 'done') {
+      controls = liveActions();
+    }
+    return `<section class="panel shootout" id="shootout">
+      <h2 class="panel-title">Penalty Shootout</h2>
+      <div class="pk-tally">${pkTally('u')}${pkTally('o')}</div>
+      <p class="pk-msg ${sh.flash || ''}">${esc(sh.msg || (shooting ? `${sh.taker} runs up...` : `${sh.taker} runs up...`))}</p>
+      <div class="pk-goal ${shooting ? 'shooting' : 'saving'}">
+        <div class="pk-net"></div>
+        ${target}
+        <div class="pk-keeper" id="pk-keeper" style="--kit:${keeperKit[0]};--kit2:${keeperKit[1]}"></div>
+        <div class="pk-ball" id="pk-ball"></div>
+        ${zones}
+      </div>
+      <div class="pk-controls">${controls}</div>
+    </section>`;
+  }
+
+  function renderShootout() {
+    const el = $('#shootout');
+    if (!el) { render(); return; }
+    el.outerHTML = shootoutHTML();
+    const f = $('#shootout [data-autofocus]');
+    if (f) f.focus({ preventScroll: true });
   }
 
   function skipLive() {
@@ -1019,7 +1244,7 @@
       const userSide = live.f.a === 0 ? 'a' : 'b';
       if (goal !== userSide) fl.classList.add('opp');
     }
-    if (live.over) {
+    if (live.over && !live.shootout) {
       $('#match-actions').innerHTML = liveActions();
       hintsEl.innerHTML = hints();
       const btn = $('#match-actions [data-autofocus]');
@@ -1048,6 +1273,7 @@
   }
 
   function liveActions() {
+    if (live.shootout && live.shootout.phase !== 'done') return '<p class="muted center">Penalties! Take them above.</p>';
     if (!live.over) {
       return `<div class="speed-row">${Object.keys(SPEEDS).map((s) => `<button class="chip mini ${liveSpeed() === s ? 'on' : ''}" data-nav data-key="spd-${s}" data-action="setSpeed" data-arg="${s}"><b>${s}</b></button>`).join('')}</div>
         <button class="btn wide" data-nav data-key="pause" data-action="togglePause">${live.paused ? 'Resume' : 'Pause'}</button>
@@ -1076,7 +1302,8 @@
         <span class="sb-clock" id="sb-clock">${live.over ? 'FT' : live.min + "'"}</span>
       </div>
       <h1 class="page-title center">${esc(live.label)}</h1>
-      <div class="live-pitch">
+      ${live.shootout ? shootoutHTML() : ''}
+      <div class="live-pitch" ${live.shootout ? 'hidden' : ''}>
         <div class="lp-lines"><i></i><i></i><i></i></div>
         <div class="lp-name left">${esc(A.name)}</div><div class="lp-name right">${esc(B.name)}</div>
         <div class="lp-ball" id="ball" style="left:${live.ball}%"></div>
@@ -1091,7 +1318,7 @@
           <section class="panel">
             <h2 class="panel-title">Match Stats</h2>
             <div id="mstats">${liveStats()}</div>
-            <div id="match-actions" class="match-actions">${liveActions()}</div>
+            <div id="match-actions" class="match-actions">${live.shootout ? '' : liveActions()}</div>
           </section>
           <section class="panel">
             <h2 class="panel-title">Around The Grounds</h2>
@@ -1427,39 +1654,14 @@
     </div>`;
   };
 
-  SCREENS.teams = () => {
-    const d = state.db;
-    const db = DB[d.era];
-    if (d.view) {
-      const t = db.teams[d.view];
-      return `<div class="page">
-        <div class="team-head">${shirt(t.kit, 'huge')}<div><h1 class="page-title">${esc(t.name)}</h1><div class="muted">${db.label} &middot; ${t.type === 'nation' ? flag(t.code) + ' ' : ''}${esc(t.league)} &middot; ${t.strength} avg top XI</div></div></div>
-        <div class="card-grid">${t.players.slice().sort((a, b) => b.ovr - a.ovr).map((p, i) => `<div class="card-cell" data-nav tabindex="0" data-key="c-${i}" ${i === 0 ? 'data-autofocus' : ''}>${card(p)}</div>`).join('')}</div>
-      </div>`;
-    }
-    const list = db.comps[d.comp].slice().sort((a, b) => b.strength - a.strength);
-    return `<div class="page">
-      <h1 class="page-title">Database</h1>
-      <div class="chip-row small">
-        ${chip('dbEra', 'now', d.era === 'now', `${DB.now.label} (${DB.now.game})`, '', 'dbe-now')}
-        ${chip('dbEra', 'retro', d.era === 'retro', `Retro 14/15 (${DB.retro.game})`, '', 'dbe-retro')}
-      </div>
-      <div class="chip-row small">
-        ${['pl', 'ucl', 'wc'].map((c) => chip('dbComp', c, d.comp === c, COMPS[c].name, '', 'dbc-' + c)).join('')}
-      </div>
-      <div class="team-grid">${list.map((t) => `<button class="team-tile" data-nav data-key="team-${t.id}" data-action="viewTeam" data-arg="${t.id}">
-        ${shirt(t.kit, 'big')}<b>${esc(t.name)}</b><small>${t.type === 'nation' ? flag(t.code) + ' ' : ''}${esc(t.league)}</small><span class="team-str">${Math.round(t.strength)}</span></button>`).join('')}</div>
-    </div>`;
-  };
-
   SCREENS.howto = () => `<div class="page">
     <h1 class="page-title">How To Play</h1>
     <div class="howto-grid">
       <section class="panel"><h2 class="panel-title">1 &middot; Pick a competition</h2><p>Premier League, Champions League or World Cup, in today's squads or Retro 2014/15. Then pick a formation.</p></section>
       <section class="panel"><h2 class="panel-title">2 &middot; Spin</h2><p>The wheel lands on a random team from that competition. You draft one of their players.</p></section>
-      <section class="panel"><h2 class="panel-title">3 &middot; Pick the position</h2><p>Choose a player, then tap where they play on the pitch. Natural spot: full rating. Similar spot: -3. Wrong spot: -10.</p></section>
+      <section class="panel"><h2 class="panel-title">3 &middot; Pick the position</h2><p>Only players for the spots you still need show up. Choose one, then tap where they play on the pitch.</p></section>
       <section class="panel"><h2 class="panel-title">4 &middot; Reroll</h2><p>Don't like the team you landed on? You get <b class="accent">${REROLLS} free rerolls</b> per draft. Need more? Get them in the Store with coins. Coins come from season results: win a trophy, reach a final, or finish top 4.</p></section>
-      <section class="panel"><h2 class="panel-title">5 &middot; Play the season</h2><p>Your XI replaces the weakest team in the competition. Watch every match live, or sim ahead.</p></section>
+      <section class="panel"><h2 class="panel-title">5 &middot; Play the season</h2><p>Your XI replaces the weakest team in the competition. Watch matches live, fast-forward with Quick Sim, or sim ahead. Level knockout games go to a penalty shootout you take yourself.</p></section>
       <section class="panel"><h2 class="panel-title">6 &middot; Formats</h2><p>Premier League: one round of fixtures. Champions League: the 8-game league phase (or 2014/15 groups), then knockouts. World Cup: groups, then knockouts.</p></section>
     </div>
     <section class="panel"><h2 class="panel-title">Controls</h2><p>Mouse or touch works everywhere. Keyboard: arrows move, Enter selects, Esc goes back, S spins, R rerolls, P pauses a match, Q / E switch tabs.</p></section>
@@ -1684,13 +1886,11 @@
       }
     },
     finishSeason,
-    dbEra: (e) => { state.db.era = e; state.db.view = null; render(); },
-    dbComp: (c) => { state.db.comp = c; render(); },
-    viewTeam: (id) => { state.db.view = id; render(true); },
     // tap twice to confirm (pop-up dialogs are not available everywhere)
     buy,
     confirmBuy: (id) => { grant(id); state.sheet = null; renderSheet(); render(); },
     closeSheet,
+    pkAim, pkShoot, pkDive,
     watchAd: () => { if (canWatchAd()) showRewardedAd(); },
     collectAd: () => {
       if (!draft || !state.sheet || state.sheet.type !== 'ad' || state.sheet.elapsed < AD_SECONDS) return;
@@ -1725,9 +1925,9 @@
 
   function switchTab(tab) {
     if (live && !live.over) { toast('Finish or skip the match first.'); return; }
+    if (live && live.shootout && live.shootout.phase !== 'done') { toast('Finish the penalty shootout first.'); return; }
     if (draft && draft.phase === 'spinning') return;
     if (live && live.over) live = null;
-    if (tab === 'teams') state.db.view = null;
     go(tab);
   }
 
@@ -1769,6 +1969,7 @@
     } else if (k === 's' && state.screen === 'draft') spin(false);
     else if (k === 'r' && state.screen === 'draft') reroll();
     else if (k === 'p' && state.screen === 'match') actions.togglePause();
+    else if (e.key === ' ' && live && live.shootout && live.shootout.phase === 'power') { e.preventDefault(); pkShoot(); }
   });
 
   if (restoreCurrent()) setTimeout(() => toast(season ? 'Welcome back. Your season is saved.' : 'Welcome back. Your draft is saved.'), 400);

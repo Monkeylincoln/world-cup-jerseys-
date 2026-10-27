@@ -1099,3 +1099,69 @@ button.hist:hover, button.hist:focus-visible { box-shadow: 0 0 0 2px var(--accen
 .ad-stage p { position: relative; margin: 0; font-size: 16px; max-width: 46ch; text-shadow: 0 2px 8px rgba(0,0,0,0.35); }
 .ad-progress { height: 6px; background: rgba(255,255,255,0.12); margin: 12px 0 2px; }
 .ad-progress i { display: block; height: 100%; background: var(--lime); transition: width 1s linear; }
+
+/* home: How To Play fills the last row now the database tile is gone */
+.tile-help { grid-column: span 2; }
+
+/* ---------- penalty shootout ---------- */
+.shootout { max-width: 760px; margin: 0 auto 18px; }
+.pk-tally { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+.pk-row { display: grid; grid-template-columns: 60px 1fr 30px; align-items: center; gap: 10px; font-family: var(--cond); font-size: 20px; text-transform: uppercase; }
+.pk-row.me b { color: var(--accent); }
+.pk-row span { text-align: right; font-weight: 800; font-size: 24px; }
+.pk-dots { display: flex; gap: 6px; flex-wrap: wrap; }
+.pk-dots i { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-style: normal; font-size: 15px; font-weight: 800;
+  background: rgba(255,255,255,0.1); box-shadow: inset 0 0 0 2px rgba(255,255,255,0.2); }
+.pk-dots i.in { background: var(--ok); color: #00230f; box-shadow: none; }
+.pk-dots i.out { background: var(--danger); color: #2b0006; box-shadow: none; }
+.pk-msg { min-height: 1.6em; text-align: center; font-family: var(--cond); font-size: 24px; text-transform: uppercase; letter-spacing: 0.5px; margin: 8px 0 !important; color: #fff !important; }
+.pk-msg.good { color: var(--lime) !important; text-shadow: 0 0 16px rgba(198,255,31,0.6); }
+.pk-msg.bad { color: #ff8a96 !important; }
+.pk-goal {
+  position: relative; width: 100%; aspect-ratio: 2.6 / 1; max-width: 100%; margin: 6px auto 14px; overflow: visible;
+  border: 6px solid #fff; border-bottom: 0; box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+  background: linear-gradient(180deg, rgba(10,40,20,0.85), rgba(20,90,40,0.85));
+}
+.pk-goal::after { content: ''; position: absolute; left: -8%; right: -8%; bottom: -14px; height: 14px; background: linear-gradient(180deg, #2c9a4c, #1d6b36); }
+.pk-net { position: absolute; inset: 0; pointer-events: none;
+  background: repeating-linear-gradient(0deg, rgba(255,255,255,0.18) 0 1px, transparent 1px 14px), repeating-linear-gradient(90deg, rgba(255,255,255,0.18) 0 1px, transparent 1px 14px); }
+.pk-keeper {
+  position: absolute; left: 50%; bottom: 0; width: 13%; height: 62%; transform: translateX(-50%);
+  transition: transform 0.45s cubic-bezier(.2,.8,.3,1); transform-origin: 50% 100%;
+}
+.pk-keeper::before { content: ''; position: absolute; left: 50%; top: 0; width: 46%; aspect-ratio: 1; transform: translateX(-50%); border-radius: 50%; background: #f1c9a5; }
+.pk-keeper::after { content: ''; position: absolute; left: 8%; right: 8%; top: 30%; bottom: 0; border-radius: 30% 30% 8% 8%;
+  background: linear-gradient(90deg, var(--kit), var(--kit2) 50%, var(--kit)); box-shadow: 0 0 0 2px rgba(0,0,0,0.25); }
+.pk-keeper.dive-l { transform: translateX(-210%) rotate(-62deg); }
+.pk-keeper.dive-r { transform: translateX(110%) rotate(62deg); }
+.pk-keeper.dive-c { transform: translateX(-50%) translateY(-6%); }
+.pk-keeper.dive-l.high { transform: translateX(-210%) translateY(-25%) rotate(-48deg); }
+.pk-keeper.dive-r.high { transform: translateX(110%) translateY(-25%) rotate(48deg); }
+.pk-keeper.dive-c.high { transform: translateX(-50%) translateY(-28%); }
+.pk-ball {
+  position: absolute; left: 50%; top: 128%; width: 5%; aspect-ratio: 1; border-radius: 50%; transform: translate(-50%, -50%);
+  background: radial-gradient(circle at 35% 35%, #fff, #d9dee5 60%, #9aa4b0); box-shadow: 0 3px 8px rgba(0,0,0,0.5); z-index: 3;
+}
+.pk-ball.kicked { transition: left 0.55s ease-out, top 0.55s ease-out, width 0.55s ease-out; width: 3.6%; }
+.pk-zones { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(2, 1fr); z-index: 4; }
+.pk-zone { border: 1px dashed rgba(255,255,255,0.3); background: transparent; cursor: pointer; transition: background 0.12s; }
+.pk-zone:hover, .pk-zone:focus-visible { background: rgba(198,255,31,0.28); outline: none; box-shadow: inset 0 0 0 3px var(--lime); }
+.pk-target { position: absolute; width: 7%; aspect-ratio: 1; transform: translate(-50%, -50%); border-radius: 50%; border: 3px solid var(--lime); box-shadow: 0 0 14px var(--lime); z-index: 2; }
+.pk-controls { display: flex; flex-direction: column; gap: 10px; }
+.pk-meter { position: relative; height: 26px; background: linear-gradient(90deg, var(--danger) 0 28%, var(--warn) 28% 40%, var(--ok) 40% 60%, var(--warn) 60% 72%, var(--danger) 72%); box-shadow: inset 0 0 0 2px rgba(255,255,255,0.3); }
+.pk-meter.top { background: linear-gradient(90deg, var(--danger) 0 33%, var(--warn) 33% 43%, var(--ok) 43% 57%, var(--warn) 57% 67%, var(--danger) 67%); }
+.pk-marker { position: absolute; top: -6px; bottom: -6px; width: 6px; margin-left: -3px; background: #fff; box-shadow: 0 0 10px #fff; }
+.pk-dive { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.pk-dive .btn { padding: 12px 6px; font-size: 17px; }
+@media (max-width: 640px) {
+  .pk-goal { aspect-ratio: 2.2 / 1; border-width: 4px; }
+  .pk-msg { font-size: 19px; }
+  .pk-row { grid-template-columns: 48px 1fr 26px; font-size: 17px; }
+  .pk-dots i { width: 22px; height: 22px; font-size: 13px; }
+  .pk-dive .btn { font-size: 14px; }
+}
+@media (prefers-reduced-motion: reduce) { .pk-keeper, .pk-ball.kicked { transition: none !important; } }
+/* the ball and keeper are scenery: never block taps on the zones or buttons */
+.pk-ball, .pk-keeper, .pk-target { pointer-events: none; }
+.pk-ball { top: 118%; }
+.pk-goal { margin-bottom: 44px; }
