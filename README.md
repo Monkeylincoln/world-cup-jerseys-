@@ -22,8 +22,9 @@ Your XI takes the place of the lowest-rated team in the competition.
 
 - **Draft:** spin, land on a team, pick a player, then tap a spot on the pitch. Like Golazo, only players whose position you still need show up; anyone for a spot you've already filled is hidden. Green spots are natural (full rating), amber are similar (-3, only for players whose position isn't in your formation).
 - **Rerolls:** 3 per draft, free. Rerolls you buy simply add to that count.
+- **Ad rerolls:** sometimes, when you land on a team, you're offered a 15-second ad for +1 reroll (also offered when you run out). Up to 2 per draft, and only if you watch to the end. Until a real rewarded-ad network is connected, the ad is a NextHalf promo; the hook is `showRewardedAd()` in `js/app.js`.
 - **Team rating** is the average of your XI after position penalties. There's no chemistry.
-- **Matches:** play live (about a minute per match at normal speed, with commentary, a ball tracker and other scores coming in), Quick Sim fast-forwards through the match in a few seconds, and Sim To End plays out the rest of the season instantly. Speed can be set to slow, normal or fast, and you can pause.
+- **Matches:** play live (about a minute per match at normal speed, with commentary, a ball tracker and other scores coming in), Quick Sim fast-forwards through the match in about 10 seconds, and Sim To End plays out the rest of the season instantly. Speed can be set to slow, normal or fast, and you can pause.
 - **Coins:** earned only from season results: 500 for winning the Champions League, World Cup or Premier League, 200 for reaching a final, 100 for a semi-final or a Premier League top 4. Nothing per match.
 - **Store:** rerolls (with coins or money), coin packs, and Remove Ads. Purchases currently run in demo mode: nothing is charged. Real billing needs a payment provider (for example Stripe) and a small server, or app store billing if NextHalf is wrapped as a phone app; the hook for it is `buy()` in `js/app.js`.
 - **Ads:** banner slots on the season and match screens show NextHalf's own promos until a real ad network is connected. Remove Ads hides them.

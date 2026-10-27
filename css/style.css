@@ -1071,3 +1071,31 @@ button.hist:hover, button.hist:focus-visible { box-shadow: 0 0 0 2px var(--accen
   .chip-row.small .chip { flex: 1 1 0; min-width: 0; text-align: center; }
   .resume-card .btn { width: 100%; }
 }
+
+/* rewarded ads */
+.btn-adreward {
+  grid-column: 1 / -1; display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap;
+  background: linear-gradient(180deg, #ff5aa8, #c4127a); color: #fff; padding: 9px 16px; font-size: 17px;
+}
+.btn-adreward small { font-size: 12px; opacity: 0.9; letter-spacing: 1px; }
+.landed .btn-adreward { margin-top: 2px; }
+.sheet .btn-adreward { margin: 12px 0 4px; }
+.play-ico { width: 0; height: 0; border-left: 12px solid #fff; border-top: 7px solid transparent; border-bottom: 7px solid transparent; }
+.ad-sheet { padding-top: 14px; }
+.ad-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-family: var(--cond); text-transform: uppercase; letter-spacing: 1px; }
+.ad-stage {
+  position: relative; overflow: hidden; min-height: 220px; padding: 24px 22px; display: flex; flex-direction: column; justify-content: flex-end; gap: 6px;
+  background: linear-gradient(135deg, var(--c1), var(--c2)); color: #fff;
+}
+.ad-burst {
+  position: absolute; inset: -50%; pointer-events: none;
+  background: repeating-conic-gradient(from 0deg, rgba(255,255,255,0.14) 0 10deg, transparent 10deg 20deg);
+  animation: ad-spin 12s linear infinite;
+}
+@keyframes ad-spin { to { transform: rotate(360deg); } }
+.ad-brand { position: absolute; top: 16px; left: 22px; font-family: var(--cond); font-size: 22px; letter-spacing: 3px; }
+.ad-brand i { font-style: normal; color: #00172a; background: #fff; padding: 0 6px; margin-left: 4px; }
+.ad-stage h3 { position: relative; margin: 0; font-family: var(--cond); font-weight: 800; font-style: italic; font-size: 38px; text-transform: uppercase; line-height: 1; text-shadow: 0 4px 18px rgba(0,0,0,0.35); }
+.ad-stage p { position: relative; margin: 0; font-size: 16px; max-width: 46ch; text-shadow: 0 2px 8px rgba(0,0,0,0.35); }
+.ad-progress { height: 6px; background: rgba(255,255,255,0.12); margin: 12px 0 2px; }
+.ad-progress i { display: block; height: 100%; background: var(--lime); transition: width 1s linear; }

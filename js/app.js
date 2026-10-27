@@ -5,7 +5,7 @@
   const HISTORY_KEY = 'nexthalf.history';
   const SPEED_KEY = 'nexthalf.speed';
   // milliseconds per match minute: "normal" plays a match in about a minute
-  const SPEEDS = { slow: 1000, normal: 650, fast: 220, quick: 50 };
+  const SPEEDS = { slow: 1000, normal: 650, fast: 220, quick: 95 };
 
   const $ = (sel, root = document) => root.querySelector(sel);
   const screenEl = $('#screen');
@@ -212,6 +212,12 @@
     league: [[1, 'Win the league', 500], [4, 'Finish top 4', 100]],
     cup: { Champion: 500, Final: 200, 'Semi-Final': 100 },
   };
+  // Rewarded ads: sometimes offered when you land on a team, and when you run out of rerolls.
+  // Until a real ad network is connected (the hook is showRewardedAd), the ad is a house promo.
+  const AD_SECONDS = 15;
+  const AD_CHANCE = 0.3;
+  const ADS_PER_DRAFT = 2;
+  const canWatchAd = () => draft && (draft.adsWatched || 0) < ADS_PER_DRAFT;
   const totalRerolls = () => (draft ? draft.rerolls : 0) + wallet.rerolls;
   const fmtNum = (n) => n.toLocaleString('en-US');
   const saveHistory = (list) => store(HISTORY_KEY, list.slice(0, 40));
@@ -555,6 +561,7 @@
         <div class="landed-kit">${shirt(t.kit, 'big')}</div>
         <div class="landed-info"><small>You landed on</small><b>${esc(t.name)}</b><span class="muted">${t.type === 'nation' ? flag(t.code) + ' ' : ''}${esc(t.league)} &middot; ${t.strength} avg</span></div>
         ${rerollButton()}
+        ${draft.adOffer && canWatchAd() ? `<button class="btn btn-adreward" data-nav data-key="watch-ad" data-action="watchAd"><span class="play-ico"></span>Watch an ad<small>+1 reroll</small></button>` : ''}
       </div>
       ${selected ? `<div class="place-hint">Now tap a spot on the pitch for <b>${esc(DB[draft.era].players[selected].name)}</b>. <span class="c-n">Green</span> = natural, <span class="c-a">amber</span> = similar spot (-3).</div>` : ''}
       <div class="player-list">
@@ -1280,7 +1287,43 @@
 
   // ----- bottom sheet (checkout and quick reroll top-up) -----
   function openSheet(sheet) { state.sheet = sheet; renderSheet(); }
-  function closeSheet() { state.sheet = null; renderSheet(); }
+  function closeSheet() { stopAd(); state.sheet = null; renderSheet(); }
+
+  const AD_PROMOS = [
+    ['Retro 14/15', 'Prime Ronaldo. Prime Messi. Robben cutting inside. Draft them all in Retro mode.', ['#c8ff1a', '#1f8a00']],
+    ['Win the Champions League', 'Lift it and bank 500 coins. Reach the final for 200.', ['#19d6ff', '#3b1fb8']],
+    ['Go ad-free', 'Remove Ads for $2.99. Ad rerolls stay available whenever you want them.', ['#ff2d8f', '#8b46ff']],
+    ['Build your best XI', 'Every finished draft goes on your leaderboard. Can you top it?', ['#ffcf1a', '#e0461f']],
+  ];
+  let adTimer = null;
+  function stopAd() { clearInterval(adTimer); adTimer = null; }
+
+  function adHTML(sh) {
+    const [title, body, [c1, c2]] = AD_PROMOS[sh.promo];
+    const left = Math.max(0, AD_SECONDS - sh.elapsed);
+    const done = left === 0;
+    return `<div class="ad-top"><span class="ad-label">Ad</span><span class="muted">${done ? 'Reward earned' : `Reward in ${left}s`}</span></div>
+      <div class="ad-stage" style="--c1:${c1};--c2:${c2}">
+        <div class="ad-burst"></div>
+        <b class="ad-brand">NEXT<i>HALF</i></b>
+        <h3>${title}</h3><p>${body}</p>
+      </div>
+      <div class="ad-progress"><i style="width:${(sh.elapsed / AD_SECONDS) * 100}%"></i></div>
+      ${done ? `<button class="btn btn-primary wide" data-nav data-key="ad-collect" data-action="collectAd" data-autofocus>Collect +1 Reroll</button>`
+        : `<button class="btn wide" data-nav data-key="ad-close" data-action="closeSheet">Close ad (no reward)</button>`}`;
+  }
+
+  // the hook for a real rewarded-ad network: grant the reward only when the ad finishes
+  function showRewardedAd() {
+    stopAd();
+    openSheet({ type: 'ad', elapsed: 0, promo: Math.floor(Math.random() * AD_PROMOS.length) });
+    adTimer = setInterval(() => {
+      if (!state.sheet || state.sheet.type !== 'ad') { stopAd(); return; }
+      state.sheet.elapsed++;
+      if (state.sheet.elapsed >= AD_SECONDS) stopAd();
+      renderSheet();
+    }, 1000);
+  }
 
   function renderSheet() {
     const el = $('#sheet');
@@ -1290,8 +1333,11 @@
     if (sh.type === 'rerolls') {
       inner = `<h2 class="panel-title">Out Of Rerolls</h2>
         <p class="lead">You've used all your rerolls. Top up to keep spinning, or pick a player from this team.</p>
+        ${canWatchAd() ? `<button class="btn btn-adreward wide" data-nav data-key="sheet-ad" data-action="watchAd" data-autofocus><span class="play-ico"></span>Watch an ad for a free reroll<small>${AD_SECONDS} seconds</small></button>` : ''}
         <div class="product-grid compact">${['c1', 'c2', 'r2', 'r6'].map((id) => productCard(id)).join('')}</div>
         <button class="btn wide" data-nav data-key="sheet-close" data-action="closeSheet">Keep This Team</button>`;
+    } else if (sh.type === 'ad') {
+      inner = adHTML(sh);
     } else {
       const pr = PRODUCTS[sh.id];
       inner = `<h2 class="panel-title">Checkout</h2>
@@ -1304,7 +1350,7 @@
         </div>`;
     }
     el.hidden = false;
-    el.innerHTML = `<div class="sheet-backdrop" data-action="closeSheet"></div><div class="sheet panel" role="dialog" aria-modal="true">${inner}</div>`;
+    el.innerHTML = `<div class="sheet-backdrop" ${sh.type === 'ad' ? '' : 'data-action="closeSheet"'}></div><div class="sheet panel ${sh.type === 'ad' ? 'ad-sheet' : ''}" role="dialog" aria-modal="true">${inner}</div>`;
     const f = el.querySelector('[data-autofocus]') || el.querySelector('.btn');
     if (f) f.focus({ preventScroll: true });
   }
@@ -1458,6 +1504,7 @@
     draft.landed = team;
     draft.lastTeamId = team.id;
     draft.phase = 'choose';
+    draft.adOffer = canWatchAd() && Math.random() < AD_CHANCE;
     if (state.screen !== 'draft') return;
     draft.justLanded = true;
     render(true);
@@ -1644,6 +1691,16 @@
     buy,
     confirmBuy: (id) => { grant(id); state.sheet = null; renderSheet(); render(); },
     closeSheet,
+    watchAd: () => { if (canWatchAd()) showRewardedAd(); },
+    collectAd: () => {
+      if (!draft || !state.sheet || state.sheet.type !== 'ad' || state.sheet.elapsed < AD_SECONDS) return;
+      draft.rerolls++;
+      draft.adsWatched = (draft.adsWatched || 0) + 1;
+      draft.adOffer = false;
+      closeSheet();
+      render();
+      toast('+1 reroll added');
+    },
     histView: (v) => { state.histView = v; render(); },
     toggleHist: (k) => { state.histOpen = state.histOpen === k ? null : k; render(); },
     clearHistory: () => {
