@@ -5,7 +5,7 @@
   const HISTORY_KEY = 'nexthalf.history';
   const SPEED_KEY = 'nexthalf.speed';
   // milliseconds per match minute: "normal" plays a match in about a minute
-  const SPEEDS = { slow: 1000, normal: 650, fast: 220 };
+  const SPEEDS = { slow: 1000, normal: 650, fast: 220, quick: 50 };
 
   const $ = (sel, root = document) => root.querySelector(sel);
   const screenEl = $('#screen');
@@ -189,6 +189,7 @@
     return null;
   }
   const loadHistory = () => store(HISTORY_KEY) || [];
+  const CURRENT_KEY = 'nexthalf.current';
 
   // ---------- wallet & store ----------
   // Purchases run in demo mode: nothing is charged. Real billing would plug into buy().
@@ -229,6 +230,40 @@
   let live = null;
 
   const currentEra = () => (season ? season.era : draft ? draft.era : state.screen === 'teams' ? state.db.era : state.setup.era);
+
+  // The draft and season in progress are saved after every change, so a reload or crash never loses them.
+  function saveCurrent() {
+    if (!draft) { store(CURRENT_KEY, { draft: null }); return; }
+    const spinning = draft.phase === 'spinning';
+    const d = {
+      ...draft,
+      slots: draft.slots.map((sl) => ({ pos: sl.pos, x: sl.x, y: sl.y, uid: sl.player ? sl.player.uid : null })),
+      used: [...draft.used],
+      // a spin in progress is saved as already landed, so reloading can't dodge a team
+      phase: spinning ? 'choose' : draft.phase,
+      landed: spinning ? draft.pendingId : draft.landed ? draft.landed.id : null,
+      selected: null, reelItems: undefined, justLanded: undefined,
+    };
+    store(CURRENT_KEY, { draft: d, season });
+  }
+
+  function restoreCurrent() {
+    const c = store(CURRENT_KEY);
+    if (!c || !c.draft || !DB[c.draft.era]) return false;
+    const db = DB[c.draft.era];
+    const d = c.draft;
+    if (d.slots.some((sl) => sl.uid && !db.players[sl.uid])) return false; // squad data changed since the save
+    draft = {
+      ...d,
+      slots: d.slots.map((sl) => ({ pos: sl.pos, x: sl.x, y: sl.y, player: sl.uid ? db.players[sl.uid] : null })),
+      used: new Set(d.used),
+      landed: d.landed ? db.teams[d.landed] || null : null,
+      selected: null,
+    };
+    if (draft.phase === 'choose' && !draft.landed) draft.phase = 'idle';
+    season = c.season || null;
+    return true;
+  }
 
   function newDraft() {
     const { era, comp, formation } = state.setup;
@@ -293,6 +328,7 @@
     let el = focusKey ? screenEl.querySelector(`[data-key="${CSS.escape(focusKey)}"]`) : null;
     if (!el || el.disabled) el = screenEl.querySelector('[data-autofocus]:not([disabled])');
     if (el) el.focus({ preventScroll: true });
+    saveCurrent();
   }
 
   function hint(key, label, action, cls = '') {
@@ -374,7 +410,7 @@
         <button class="tile tile-hero" data-nav data-key="t-draft" data-action="go" data-arg="setup" data-autofocus>
           <div class="tile-art art-pitch">${miniFormation('4-3-3')}</div>
           <div class="tile-badge">${REROLLS} free rerolls</div>
-          <div class="tile-label"><small>${resume ? 'Continue' : 'Play'}</small>${resume ? 'Resume' : 'Draft Mode'}</div>
+          <div class="tile-label"><small>${resume ? 'Pick up where you left off' : 'Play'}</small>${resume ? 'Continue Draft' : 'Draft Mode'}</div>
         </button>
         ${compTile('pl', 'now', DB.now.label)}
         ${compTile('ucl', 'now', DB.now.label)}
@@ -385,7 +421,7 @@
         ${compTile('wc', 'now', 'Nations')}
         <button class="tile tile-squads" data-nav data-key="t-squads" data-action="go" data-arg="squads">
           <div class="tile-art art-stat"><b>${titles}</b><span>Trophies</span><span>${hist.length} seasons played</span></div>
-          <div class="tile-label"><small>History</small>My Squads</div>
+          <div class="tile-label"><small>Your best drafts</small>Leaderboard</div>
         </button>
         <button class="tile tile-store" data-nav data-key="t-store" data-action="go" data-arg="store">
           <div class="tile-art art-stat"><b>${fmtNum(wallet.coins)}</b><span>Coins</span><span>${wallet.rerolls} reroll${wallet.rerolls === 1 ? '' : 's'} saved</span></div>
@@ -794,7 +830,7 @@
     };
   }
 
-  function startMatchday(watch) {
+  function startMatchday(watch, speedKey = null) {
     const fx = currentFixtures();
     const uf = season.userOut ? null : fx.find((f) => f.a === 0 || f.b === 0);
     const others = fx.filter((f) => f !== uf).map(quickMatch);
@@ -803,6 +839,7 @@
       return;
     }
     live = buildLive(uf, others);
+    live.speedKey = speedKey;
     state.screen = 'match';
     render(true);
     live.shown = live.feed.length;
@@ -810,6 +847,7 @@
   }
 
   function commitMatchday(results) {
+    queueMicrotask(saveCurrent);
     const label = stageLabel();
     season.last = { label, results };
     const mine = results.find((r) => r.a === 0 || r.b === 0);
@@ -887,9 +925,12 @@
   }
 
   // ---------- live match ----------
+  // a Quick Sim match runs at fast-forward speed without changing your saved speed
+  const liveSpeed = () => (live && live.speedKey) || state.speed;
+
   function scheduleTick(delay) {
     clearTimeout(live.timer);
-    live.timer = setTimeout(tick, delay ?? SPEEDS[state.speed]);
+    live.timer = setTimeout(tick, delay ?? SPEEDS[liveSpeed()]);
   }
 
   function tick() {
@@ -925,7 +966,7 @@
 
     if (m >= 90) finishLive();
     updateLiveDOM(goal);
-    if (!live.over && !live.skipping) scheduleTick(m === 45 ? SPEEDS[state.speed] * 4 : undefined);
+    if (!live.over && !live.skipping) scheduleTick(m === 45 ? Math.max(SPEEDS[liveSpeed()] * 4, 600) : undefined);
   }
 
   function finishLive() {
@@ -959,7 +1000,7 @@
     live.shown = live.feed.length;
     $('#mstats').innerHTML = liveStats();
     $('#ball').style.left = live.ball + '%';
-    $('#ball').style.transitionDuration = Math.min(SPEEDS[state.speed], 700) + 'ms';
+    $('#ball').style.transitionDuration = Math.min(SPEEDS[liveSpeed()], 700) + 'ms';
     $('#clockbar').style.width = (live.min / 90) * 100 + '%';
     const other = $('#others');
     if (other) other.innerHTML = othersHTML();
@@ -1001,7 +1042,7 @@
 
   function liveActions() {
     if (!live.over) {
-      return `<div class="speed-row">${Object.keys(SPEEDS).map((s) => `<button class="chip mini ${state.speed === s ? 'on' : ''}" data-nav data-key="spd-${s}" data-action="setSpeed" data-arg="${s}"><b>${s}</b></button>`).join('')}</div>
+      return `<div class="speed-row">${Object.keys(SPEEDS).map((s) => `<button class="chip mini ${liveSpeed() === s ? 'on' : ''}" data-nav data-key="spd-${s}" data-action="setSpeed" data-arg="${s}"><b>${s}</b></button>`).join('')}</div>
         <button class="btn wide" data-nav data-key="pause" data-action="togglePause">${live.paused ? 'Resume' : 'Pause'}</button>
         <button class="btn wide" data-nav data-key="skip" data-action="skipMatch">Skip To Full Time</button>`;
     }
@@ -1087,6 +1128,14 @@
         <button class="btn btn-primary wide" data-nav data-key="simend" data-action="simToEnd" data-autofocus>See Who Wins</button>
         <button class="btn wide" data-nav data-key="finish" data-action="finishSeason">Save &amp; Finish Now</button>
       </section>`;
+    } else if (!currentFixtures().some((x) => x.a === 0 || x.b === 0)) {
+      main = `<section class="panel next-card">
+        <h2 class="panel-title">${esc(stageLabel())}</h2>
+        <p class="lead">${esc(season.byeNote || 'You have a bye this round.')}</p>
+        <p class="muted">The other clubs play this round. You're straight through to the next one.</p>
+        <button class="btn btn-primary wide" data-nav data-key="simround" data-action="simRound" data-autofocus>Play Out ${esc(stageLabel())}</button>
+        <button class="btn btn-violet wide" data-nav data-key="simend" data-action="simToEnd">Sim To End</button>
+      </section>`;
     } else {
       const f = currentFixtures().find((x) => x.a === 0 || x.b === 0);
       const A = E[f.a], B = E[f.b];
@@ -1100,7 +1149,7 @@
           <button class="btn btn-orange" data-nav data-key="quick" data-action="quickMatch">Quick Sim</button>
           <button class="btn btn-violet" data-nav data-key="simend" data-action="simToEnd">Sim To End</button>
         </div>
-        <p class="muted center small-note">Play Match runs live at ${state.speed} speed (about ${Math.round((SPEEDS[state.speed] * 90) / 1000)}s).</p>
+        <p class="muted center small-note">Play Match runs at ${state.speed} speed (about ${Math.round((SPEEDS[state.speed] * 90) / 1000)}s). Quick Sim fast-forwards through it in a few seconds.</p>
       </section>`;
     }
 
@@ -1300,17 +1349,32 @@
     </div>`;
   };
 
+  const entryScore = (h) => (h.score != null ? h.score : (h.champion ? 1000 : 0) + h.rating);
+
   SCREENS.squads = () => {
-    const hist = loadHistory();
+    const hist = loadHistory().map((h, i) => ({ ...h, key: String(h.id || 'old' + i) }));
+    const view = state.histView || 'best';
+    const list = view === 'best' ? hist.slice().sort((a, b) => entryScore(b) - entryScore(a)) : hist;
+    const resume = draft && (season || draft.slots.some((sl) => sl.player));
     return `<div class="page">
       <h1 class="page-title">My Squads</h1>
-      ${hist.length ? `<div class="hist-list">${hist.map((h, i) => `<div class="hist ${h.champion ? 'champ' : ''}" data-nav tabindex="0" data-key="h-${i}" ${i === 0 ? 'data-autofocus' : ''}>
-          <div class="hist-badge">${h.champion ? '&#127942;' : esc(h.compShort || '')}</div>
-          <div class="hist-main"><b>${esc(h.name)}</b><span class="muted">${esc(h.compName || '')} ${esc(h.eraLabel || '')} &middot; ${esc(h.formation)} &middot; ${esc(h.date)} &middot; ${h.rerollsUsed} reroll${h.rerollsUsed === 1 ? '' : 's'} used</span>
+      ${resume ? `<section class="panel resume-card"><div><b>Draft in progress</b><span class="muted">${esc(draft.name)} &middot; ${COMPS[draft.comp].name} ${DB[draft.era].label}${season ? ` &middot; ${esc(season.done ? 'season complete' : stageLabel())}` : ` &middot; ${draft.slots.filter((sl) => sl.player).length}/11 picked`}</span></div>
+        <button class="btn btn-primary" data-nav data-key="resume" data-action="go" data-arg="setup" data-autofocus>Continue Draft</button></section>` : ''}
+      ${hist.length ? `<div class="chip-row small">
+          ${chip('histView', 'best', view === 'best', 'Leaderboard', '', 'hv-best')}
+          ${chip('histView', 'recent', view === 'recent', 'Recent', '', 'hv-recent')}
+        </div>
+        <div class="hist-list">${list.map((h, i) => {
+          const open = state.histOpen === h.key;
+          return `<button class="hist ${h.champion ? 'champ' : ''} ${open ? 'open' : ''}" data-nav data-key="h-${h.key}" data-action="toggleHist" data-arg="${h.key}" ${!resume && i === 0 ? 'data-autofocus' : ''}>
+          <div class="hist-badge">${view === 'best' ? `<span class="rank r${i + 1}">${i + 1}</span>` : h.champion ? '&#127942;' : esc(h.compShort || '')}</div>
+          <div class="hist-main"><b>${h.champion ? '&#127942; ' : ''}${esc(h.name)}</b><span class="muted">${esc(h.compName || '')} ${esc(h.eraLabel || '')} &middot; ${esc(h.formation)} &middot; ${esc(h.date)} &middot; ${h.rerollsUsed} reroll${h.rerollsUsed === 1 ? '' : 's'} used</span>
             <span class="hist-stars">${(h.stars || []).map((p) => esc(p)).join(' &middot; ')}</span></div>
           <div class="hist-stat"><small>OVR</small><b>${h.rating}</b></div>
           <div class="hist-result">${esc(h.result)}</div>
-        </div>`).join('')}</div>
+          ${open ? `<div class="hist-xi">${h.xi ? h.xi.map((x) => `<span class="xi-pill ${x.t ? 'toty' : ''}"><b>${x.o}</b><i>${esc(x.p)}</i>${esc(x.c)}</span>`).join('') : '<span class="muted">Line-ups are saved for seasons finished from now on.</span>'}</div>` : ''}
+        </button>`;
+        }).join('')}</div>
         <div class="action-row"><button class="btn ${state.confirmClear ? 'btn-danger' : ''}" data-nav data-key="clear" data-action="clearHistory">${state.confirmClear ? 'Tap Again To Clear Everything' : 'Clear History'}</button></div>`
         : `<section class="panel empty-state"><p class="lead">No seasons yet. Finish one and it shows up here.</p>
           <button class="btn btn-primary" data-nav data-key="go-draft" data-action="go" data-arg="setup" data-autofocus>Start A Draft</button></section>`}
@@ -1368,6 +1432,7 @@
     const target = rand(options);
 
     const TARGET_INDEX = 26;
+    draft.pendingId = target.id;
     draft.reelItems = Array.from({ length: TARGET_INDEX + 4 }, (_, i) => (i === TARGET_INDEX ? target : rand(all)));
     draft.phase = 'spinning';
     draft.landed = null;
@@ -1490,7 +1555,14 @@
       result = `Won the Final ${fin.gf}-${fin.ga}${fin.pens ? ` (${fin.pens} pens)` : ''} vs ${fin.opp}`;
     } else result = season.exit || `Left during the ${stageLabel()}`;
     const st = squadStats(draft.slots);
+    // how far you went, for ranking on the leaderboard
+    let tier;
+    if (season.fmt === 'league') tier = season.done ? (season.position === 1 ? 100 : season.position <= 4 ? 60 : Math.max(5, 45 - season.position)) : 5;
+    else if (champion) tier = 100;
+    else tier = { Final: 80, 'Semi-Final': 65, 'Quarter-Final': 50, 'Round of 16': 35, 'Knockout Play-off': 25 }[season.exitRound] || 15;
     const entry = {
+      id: Date.now(), score: tier * 10 + st.rating,
+      xi: draft.slots.map((sl) => ({ c: sl.player.card, p: sl.pos, o: effOvr(sl), t: sl.player.toty ? 1 : 0 })),
       name: draft.name, formation: draft.formation, rating: st.rating, champion, result,
       compName: COMPS[season.comp].name, compShort: COMPS[season.comp].short, eraLabel: DB[season.era].label,
       rerollsUsed: REROLLS - draft.rerolls + (draft.boughtUsed || 0), date: new Date().toLocaleDateString(),
@@ -1538,7 +1610,9 @@
       render(true);
     },
     watchMatch: () => startMatchday(true),
-    quickMatch: () => { startMatchday(false); render(true); },
+    quickMatch: () => startMatchday(true, 'quick'),
+    // the user has a bye (top 8 in the league phase): play out the round without them
+    simRound: () => { startMatchday(false); render(true); },
     simToEnd: () => {
       let guard = 200;
       while (season && !season.done && guard--) startMatchday(false);
@@ -1556,6 +1630,7 @@
     setSpeed: (s) => {
       state.speed = s;
       store(SPEED_KEY, s);
+      if (live) live.speedKey = null;
       if (live && !live.over) {
         $('#match-actions').innerHTML = liveActions();
         if (!live.paused) scheduleTick();
@@ -1569,6 +1644,8 @@
     buy,
     confirmBuy: (id) => { grant(id); state.sheet = null; renderSheet(); render(); },
     closeSheet,
+    histView: (v) => { state.histView = v; render(); },
+    toggleHist: (k) => { state.histOpen = state.histOpen === k ? null : k; render(); },
     clearHistory: () => {
       if (state.confirmClear) { saveHistory([]); state.confirmClear = false; } else state.confirmClear = true;
       render();
@@ -1637,5 +1714,6 @@
     else if (k === 'p' && state.screen === 'match') actions.togglePause();
   });
 
+  if (restoreCurrent()) setTimeout(() => toast(season ? 'Welcome back. Your season is saved.' : 'Welcome back. Your draft is saved.'), 400);
   render(true);
 })();

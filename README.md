@@ -23,11 +23,13 @@ Your XI takes the place of the lowest-rated team in the competition.
 - **Draft:** spin, land on a team, pick a player, then tap a spot on the pitch. Like Golazo, only players whose position you still need show up; anyone for a spot you've already filled is hidden. Green spots are natural (full rating), amber are similar (-3, only for players whose position isn't in your formation).
 - **Rerolls:** 3 per draft, free. Rerolls you buy simply add to that count.
 - **Team rating** is the average of your XI after position penalties. There's no chemistry.
-- **Matches:** play live (about a minute per match at normal speed, with commentary, a ball tracker and other scores coming in), or quick sim / sim to the end. Speed can be set to slow, normal or fast, and you can pause.
+- **Matches:** play live (about a minute per match at normal speed, with commentary, a ball tracker and other scores coming in), Quick Sim fast-forwards through the match in a few seconds, and Sim To End plays out the rest of the season instantly. Speed can be set to slow, normal or fast, and you can pause.
 - **Coins:** earned only from season results: 500 for winning the Champions League, World Cup or Premier League, 200 for reaching a final, 100 for a semi-final or a Premier League top 4. Nothing per match.
 - **Store:** rerolls (with coins or money), coin packs, and Remove Ads. Purchases currently run in demo mode: nothing is charged. Real billing needs a payment provider (for example Stripe) and a small server, or app store billing if NextHalf is wrapped as a phone app; the hook for it is `buy()` in `js/app.js`.
 - **Ads:** banner slots on the season and match screens show NextHalf's own promos until a real ad network is connected. Remove Ads hides them.
-- Results, coins and purchases are saved in the browser (local storage), per device.
+- **Continue Draft:** the draft and season in progress are saved after every change, so closing the page (or a crash) never loses them.
+- **Leaderboard:** My Squads ranks your finished drafts best-first (trophies, then how far you went, then rating). Tap one to see its XI.
+- Results, coins, purchases and the draft in progress are saved in the browser (local storage), per device.
 
 Keyboard: arrows to move, Enter to select, Esc to go back, S to spin, R to reroll, P to pause a match, Q / E to switch tabs.
 
