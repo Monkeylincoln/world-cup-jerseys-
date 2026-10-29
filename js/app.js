@@ -547,7 +547,7 @@
     // like Golazo: players for spots you've already filled (or already in your squad) don't appear
     const rows = t.players.map((p) => ({ p, taken: draft.used.has(p.name), ...openFits(p) }))
       .filter((r) => !r.taken && r.best !== 'x')
-      .sort((a, b) => ('na'.indexOf(a.best) - 'na'.indexOf(b.best)) || (b.p.ovr - a.p.ovr));
+      .sort((a, b) => b.p.ovr - a.p.ovr || ('na'.indexOf(a.best) - 'na'.indexOf(b.best)));
     const first = rows[0];
     const selected = draft.selected;
     return `<section class="panel panel-tall">${head}${steps(selected ? 2 : 1)}
