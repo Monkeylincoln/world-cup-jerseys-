@@ -1691,13 +1691,21 @@
     const strip = $('#reel-strip');
     if (!reel || !strip) { land(target); return; }
     if (window.innerWidth <= 1000) reel.scrollIntoView({ block: 'center', behavior: 'smooth' });
-    const item = strip.children[0].getBoundingClientRect().width;
-    const offset = -(TARGET_INDEX * item) + reel.clientWidth / 2 - item / 2;
+    // Measure in layout pixels (offsetLeft/offsetWidth), the same units translateX uses. On-screen sizes
+    // (getBoundingClientRect) change when the page is zoomed, which made the wheel stop between teams.
+    const hit = strip.children[TARGET_INDEX];
+    const centre = () => reel.clientWidth / 2 - (hit.offsetLeft + hit.offsetWidth / 2);
     requestAnimationFrame(() => requestAnimationFrame(() => {
       strip.style.transition = 'transform 2.4s cubic-bezier(.12,.75,.16,1)';
-      strip.style.transform = `translateX(${offset}px)`;
+      strip.style.transform = `translateX(${centre()}px)`;
     }));
-    setTimeout(() => { if (strip.children[TARGET_INDEX]) strip.children[TARGET_INDEX].classList.add('hit'); }, 2420);
+    setTimeout(() => {
+      if (!hit.isConnected) return;
+      // if anything moved during the spin (rotation, resize), settle exactly on the team
+      strip.style.transition = 'transform 0.15s ease-out';
+      strip.style.transform = `translateX(${centre()}px)`;
+      hit.classList.add('hit');
+    }, 2420);
     setTimeout(() => land(target), 3000);
   }
 
